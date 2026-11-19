@@ -11,14 +11,28 @@ public static class PauseControl {
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ultimate Win" Width="1120" Height="730" MinWidth="900" MinHeight="590" WindowStartupLocation="CenterScreen" FontFamily="Segoe UI" Background="{DynamicResource Backdrop}" Foreground="{DynamicResource Ink}">
 <Window.Resources>
 <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
-<Style TargetType="PasswordBox"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
 <Style TargetType="DataGrid"><Setter Property="Background" Value="{DynamicResource Glass}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="RowBackground" Value="{DynamicResource Surface}"/><Setter Property="AlternatingRowBackground" Value="{DynamicResource Glass}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource Edge}"/></Style>
 <Style TargetType="DataGridColumnHeader"><Setter Property="Padding" Value="10,8"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
 <Style TargetType="Button"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Padding" Value="14,9"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="box" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}" BorderBrush="{DynamicResource Edge}" BorderThickness="1"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="box" Property="Opacity" Value=".78"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="box" Property="Opacity" Value=".45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
-<Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="8,5"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+<Style TargetType="TextBox">
+  <Setter Property="Background" Value="{DynamicResource Field}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="CaretBrush" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="10,7"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox"><Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7" Padding="{TemplateBinding Padding}"><ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/></Border><ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style TargetType="PasswordBox">
+  <Setter Property="Background" Value="{DynamicResource Field}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="CaretBrush" Value="{DynamicResource Ink}"/><Setter Property="Padding" Value="10,7"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="PasswordBox"><Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Edge}" BorderThickness="1" CornerRadius="7" Padding="{TemplateBinding Padding}"><ScrollViewer x:Name="PART_ContentHost"/></Border><ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+</Style>
+<Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Padding" Value="10,6"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" Background="Transparent" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource Outgoing}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource Outgoing}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+<Style TargetType="ComboBox"><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
+<Border Background="{DynamicResource Field}" BorderBrush="{DynamicResource Edge}" BorderThickness="1" CornerRadius="7"/>
+<TextBox x:Name="PART_EditableTextBox" Margin="1,1,30,1" Background="Transparent" BorderThickness="0"/>
+<ToggleButton Focusable="False" HorizontalAlignment="Right" Width="30" IsChecked="{Binding IsDropDownOpen,RelativeSource={RelativeSource TemplatedParent},Mode=TwoWay}"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="Transparent"><TextBlock Text="⌄" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Ink}"/></Border></ControlTemplate></ToggleButton.Template></ToggleButton>
+<Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True"><Border Background="{DynamicResource Field}" BorderBrush="{DynamicResource Edge}" BorderThickness="1" CornerRadius="7" MinWidth="{Binding ActualWidth,RelativeSource={RelativeSource TemplatedParent}}"><ScrollViewer MaxHeight="220"><ItemsPresenter/></ScrollViewer></Border></Popup>
+</Grid></ControlTemplate></Setter.Value></Setter></Style>
+
 </Window.Resources>
-<Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-<Border Background="{DynamicResource Sidebar}" CornerRadius="18" Padding="14,22" BorderThickness="1" BorderBrush="{DynamicResource Edge}"><DockPanel><Button Name="ThemeSwitch" DockPanel.Dock="Bottom" Margin="2,12,2,0"/><StackPanel><StackPanel Orientation="Horizontal" Margin="0,0,0,24"><Image Name="BrandIcon" Width="36" Height="36"/><TextBlock Text="Ultimate Win" FontWeight="SemiBold" FontSize="20" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/></StackPanel><StackPanel Name="Nav"/></StackPanel></DockPanel></Border>
+<Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="222"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<Border Background="{DynamicResource Sidebar}" CornerRadius="18" Padding="14,22" BorderThickness="1" BorderBrush="{DynamicResource Edge}"><DockPanel><Button Name="ThemeSwitch" DockPanel.Dock="Bottom" Margin="2,12,2,0"/><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel><StackPanel Orientation="Horizontal" Margin="0,0,0,24"><Image Name="BrandIcon" Width="36" Height="36"/><TextBlock Text="Ultimate Win" FontWeight="SemiBold" FontSize="20" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/></StackPanel><StackPanel Name="Nav"/></StackPanel></ScrollViewer></DockPanel></Border>
 <Border Grid.Column="1" Margin="12,0,0,0" Background="{DynamicResource Glass}" BorderBrush="{DynamicResource Edge}" BorderThickness="1" CornerRadius="18" Padding="24"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <TextBlock Name="Heading" FontSize="30" FontWeight="SemiBold"/><TextBlock Name="Hint" Grid.Row="1" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Margin="0,6,0,18"/>
 <StackPanel Name="Controls" Grid.Row="2"/><Grid Name="Body" Grid.Row="3" Margin="0,5"/>
@@ -48,12 +62,12 @@ $themeFile=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Ult
 function SetTheme($dark) {
     $script:darkTheme=[bool]$dark
     $palette=if ($dark) {
-        @{Outgoing='#EB20454A'; Ink='#F1F5FB'; Muted='#ACC2D1'; Glass='#B0181C24'; Surface='#F3242B36'; Sidebar='#CC0A1018'; Edge='#565E7888'; Start='#080B11'; Glow='#15444B'; End='#18152D'}
+        @{Field='#18252F'; Accent='#60CFC0'; Outgoing='#EB20454A'; Ink='#F1F5FB'; Muted='#ACC2D1'; Glass='#B0181C24'; Surface='#F3242B36'; Sidebar='#CC0A1018'; Edge='#565E7888'; Start='#080B11'; Glow='#15444B'; End='#18152D'}
     } else {
-        @{Outgoing='#EDC9ECE8'; Ink='#102C3C'; Muted='#405F71'; Glass='#ACFFFFFF'; Surface='#EAF9FCFF'; Sidebar='#DC183044'; Edge='#887C9EAC'; Start='#C1DCE5'; Glow='#9EE0DC'; End='#D8CFEB'}
+        @{Field='#E6F0F2'; Accent='#16736C'; Outgoing='#EDC9ECE8'; Ink='#102C3C'; Muted='#405F71'; Glass='#ACFFFFFF'; Surface='#EAF9FCFF'; Sidebar='#DC183044'; Edge='#887C9EAC'; Start='#C1DCE5'; Glow='#9EE0DC'; End='#D8CFEB'}
     }
     $brush=[Windows.Media.BrushConverter]::new()
-    foreach ($key in 'Outgoing','Ink','Muted','Glass','Surface','Sidebar','Edge') {
+    foreach ($key in 'Accent','Field','Outgoing','Ink','Muted','Glass','Surface','Sidebar','Edge') {
         $win.Resources[$key]=$brush.ConvertFromString($palette[$key])
     }
     $gradient=[Windows.Media.LinearGradientBrush]::new()
@@ -80,7 +94,7 @@ $themeSwitch.Add_Click({
         [IO.File]::WriteAllText($themeFile,$value)
     } catch {$Status.Text='Тема применена только для текущего сеанса'}
 })
-$pages='Обзор','Процессы','Автозагрузка','Устройства','Файлы','Сеть','Диагностика','ИИ-помощник'
+$pages='Обзор','Процессы','Автозагрузка','Устройства','Драйверы','Программы','Диски','Файлы','Память','Сеть','Диагностика','ИИ-помощник'
 $navButtons=@{}
 $paused=@{}
 $history=New-Object Collections.ArrayList
@@ -138,6 +152,7 @@ function Fill($items) {
     }
     $grid.ItemsSource=$data
     $Status.Text="Строк: $($data.Count)"
+    if ($searchBox -and $searchBox.Text) {FilterTable}
 }
 function Run($code,$arguments,$done,$operation='') {
     if ($script:job) {return}
@@ -182,8 +197,64 @@ $timer.Add_Tick({
     } catch {$Status.Text="Ошибка: $($_.Exception.Message)"}
     finally {$finished.ps.Dispose()}
 })
-function Confirm($text) {
-    [Windows.MessageBox]::Show($win,$text,'Ultimate Win','YesNo','Question','No') -eq 'Yes'
+function AppDialog($title,$message,$initial,$accept) {
+    $dialog=New-Object Windows.Window
+    $dialog.Owner=$win;$dialog.Title=$title;$dialog.WindowStartupLocation='CenterOwner'
+    $dialog.Width=470;$dialog.SizeToContent='Height';$dialog.ResizeMode='NoResize'
+    $dialog.Resources.MergedDictionaries.Add($win.Resources)
+    $dialog.Background=$win.Resources['Field'];$dialog.Foreground=$win.Resources['Ink']
+    $dialog.Icon=$win.Icon;$dialog.FontFamily=$win.FontFamily
+    $panel=New-Object Windows.Controls.StackPanel;$panel.Margin='22';$dialog.Content=$panel
+    (Label $panel $title 20).FontWeight='SemiBold'
+    [void](Label $panel $message 14)
+    if ($null -ne $initial) {
+        $box=New-Object Windows.Controls.TextBox;$box.Text=$initial;$box.Margin='0,8,0,4'
+        [void]$panel.Children.Add($box)
+        $problem=Label $panel '' 13
+    }
+    $buttons=New-Object Windows.Controls.WrapPanel;$buttons.Margin='0,12,0,0';$buttons.HorizontalAlignment='Right'
+    [void]$panel.Children.Add($buttons)
+    $no=Button $buttons 'Отмена' {$dialog.DialogResult=$false};$no.IsCancel=$true
+    $yes=Button $buttons $accept {
+        if ($null -ne $initial) {
+            try {
+                $path=Get-Item -LiteralPath $box.Text.Trim() -Force -ErrorAction Stop
+                if ($path -isnot [IO.DirectoryInfo]) {throw 'folder'}
+                $dialog.Tag=$path.FullName
+            } catch {$problem.Text='Введите путь к существующей папке';return}
+        }
+        $dialog.DialogResult=$true
+    }
+    $yes.Background='#186D73';$yes.Foreground='White'
+    if ($null -ne $initial) {$yes.IsDefault=$true}
+    if ($dialog.ShowDialog()) {if ($null -ne $initial) {return $dialog.Tag};return $true}
+    if ($null -eq $initial) {return $false}
+}
+function Confirm($text) {AppDialog 'Подтверждение' $text $null 'Продолжить'}
+function ChooseFolder($title,$initial) {AppDialog $title 'Путь к папке' $initial 'Выбрать'}
+function SearchTable {
+    $r=Row
+    [void](Label $r 'Поиск' 13)
+    $script:searchBox=New-Object Windows.Controls.TextBox
+    [Windows.Automation.AutomationProperties]::SetAutomationId($searchBox,'InventorySearch')
+    $searchBox.Width=260;$searchBox.Margin='0,0,0,7'
+    [void]$r.Children.Add($searchBox)
+    $searchBox.Add_TextChanged({if ($grid.ItemsSource) {FilterTable}})
+}
+function FilterTable {
+    $term=$searchBox.Text.Trim()
+    $view=[Windows.Data.CollectionViewSource]::GetDefaultView($grid.ItemsSource)
+    if (!$view -or !$view.CanFilter) {return}
+    if (!$term) {$view.Filter=$null} else {
+        $filter={param($row)
+            foreach ($prop in $row.PSObject.Properties) {
+                if ($prop.Name -ne 'Target' -and ([string]$prop.Value).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {return $true}
+            }
+            return $false
+        }.GetNewClosure()
+        $view.Filter=[Predicate[object]]$filter
+    }
+    $Status.Text="Строк: $($view.Count)"
 }
 function Dashboard {
     $script:nextRefresh=[DateTime]::MaxValue
@@ -383,13 +454,14 @@ function ExplainSelection {
 }
 function Page($name) {
     if ($script:active -eq 'ИИ-помощник') {RememberChat}
+    $script:searchBox=$null
     $script:active=$name; $Heading.Text=$name
     $Controls.Children.Clear();$Body.Children.Clear();$Status.Text=''
     foreach ($entry in $navButtons.GetEnumerator()) {
         $entry.Value.Background=if ($entry.Key -eq $name){'#206A78'}else{'#1B374F'}
     }
     $r=Row
-    if ($name -in 'Процессы','Автозагрузка','Устройства') {
+    if ($name -in 'Процессы','Автозагрузка','Устройства','Диски','Драйверы','Память') {
         [void](Button $r 'Объяснить' {ExplainSelection})
     }
     switch ($name) {
@@ -435,11 +507,67 @@ function Page($name) {
             [void](Button $r 'Обновить' {Page 'Устройства'})
             Table;Run 'Devices' @() {param($rows) Fill $rows}
         }
+        'Диски' {
+            $Hint.Text='Разделы и свободное место. Выберите локальный том с буквой для проверки файловой системы.'
+            [void](Button $r 'Разделы' {Page 'Диски'})
+            [void](Button $r 'Накопители' {Run 'DriveHealth' @() {param($rows) Fill $rows}})
+            [void](Button $r 'Проверить том' {
+                $letter=$grid.SelectedItem.Том
+                if (!$letter) {$Status.Text='Выберите том с буквой в списке разделов';return}
+                if (Confirm "Проверить файловую систему $letter в режиме чтения? Windows запросит права администратора. Отчёт появится в окне CHKDSK.") {
+                    Run 'param($volume) CheckDisk $volume' @($letter) {param($rows) $Status.Text=$rows[0]}
+                }
+            })
+            Table;Run 'DiskPartitions' @() {param($rows) Fill $rows}
+        }
+        'Драйверы' {
+            $Hint.Text='Версии, поставщики и подписи установленных драйверов.'
+            [void](Button $r 'Обновить список' {Page 'Драйверы'})
+            [void](Button $r 'Экспорт INF' {
+                $inf=$grid.SelectedItem.INF
+                if ($inf -notmatch '^oem[0-9]+\.inf$') {$Status.Text='Для экспорта выберите сторонний пакет oem*.inf';return}
+                $folder=ChooseFolder 'Папка для копии драйвера' ([Environment]::GetFolderPath('MyDocuments'))
+                if ($folder) {
+                    Run 'param($inf,$dest) if($inf -notmatch "^oem[0-9]+\.inf$"){throw "Недопустимое имя INF"}; $out=& "$env:SystemRoot\System32\pnputil.exe" /export-driver $inf $dest; if($LASTEXITCODE){throw ($out -join " ")}' @($inf,$folder) {$Status.Text='Пакет драйвера экспортирован'}
+                }
+            })
+            [void](Button $r 'Windows Update' {Start-Process 'ms-settings:windowsupdate'})
+            SearchTable
+            Table;Run 'DriverList' @() {param($rows) Fill $rows}
+        }
+        'Программы' {
+            $Hint.Text='Установленные классические приложения. Найдите программу по названию или издателю.'
+            [void](Button $r 'Обновить' {Page 'Программы'})
+            [void](Button $r 'Удалить…' {
+                $row=$grid.SelectedItem
+                if (!$row) {$Status.Text='Выберите программу';return}
+                $product=$row.Target.Product
+                if ($product -match '^\{[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\}$') {
+                    if (Confirm "Открыть мастер удаления «$($row.Название)»?") {
+                        Run 'param($id) $p=Start-Process "$env:SystemRoot\System32\msiexec.exe" -ArgumentList "/x $id" -PassThru -Wait; if ($p.ExitCode -notin 0,3010,1602){throw "Код Windows Installer: $($p.ExitCode)"}; InstalledApps | Sort-Object Название' @($product) {param($rows) Fill $rows}
+                    }
+                } elseif (Confirm "Открыть установленные приложения Windows для удаления «$($row.Название)»? Выберите программу в системном списке.") {
+                    Start-Process 'ms-settings:appsfeatures'
+                }
+            })
+            [void](Button $r 'Все приложения Windows' {Start-Process 'ms-settings:appsfeatures'})
+            SearchTable
+            Table;Run 'InstalledApps | Sort-Object Название' @() {param($rows) Fill $rows}
+        }
+        'Память' {
+            $Hint.Text='Физическая память, кэш и выделение виртуальной памяти — по данным Windows.'
+            [void](Button $r 'Использование' {Page 'Память'})
+            [void](Button $r 'Модули ОЗУ' {Run 'MemoryModules' @() {param($rows) Fill $rows}})
+            [void](Button $r 'Проверка ОЗУ…' {
+                if (Confirm 'Открыть диагностику памяти Windows? В системном окне можно выбрать проверку при следующем запуске.') {Start-Process "$env:SystemRoot\System32\mdsched.exe"}
+            })
+            Table;Run 'MemoryOverview' @() {param($rows) Fill $rows}
+        }
         'Файлы' {
             $Hint.Text='Выберите папку и режим поиска. Дубли сравниваются по содержимому. Недоступные папки и ссылки пропускаются.'
             [void](Button $r 'Выбрать папку' {
-                $dlg=New-Object Windows.Forms.FolderBrowserDialog
-                try {if ($dlg.ShowDialog() -eq 'OK') {$script:root=$dlg.SelectedPath;$script:mode='size';Page 'Файлы'}} finally {$dlg.Dispose()}
+                $folder=ChooseFolder 'Выберите папку' $root
+                if ($folder) {$script:root=$folder;$script:mode='size';Page 'Файлы'}
             })
             foreach ($choice in @(@('По папкам','folders'),@('Размеры','size'),@('Дубли','dup'),@('Пустые','empty'),@('TEMP','temp'))) {
                 $btn=Button $r $choice[0] {param($sender,$e)
@@ -550,7 +678,7 @@ function Page($name) {
         }
     }
 }
-$glyphs=@('E80F','E950','E7E8','E772','E8B7','E774','E9D9','E8F2')
+$glyphs=@('E80F','E950','E7E8','E772','E950','ECAA','EDA2','E8B7','E950','E774','E9D9','E8F2')
 foreach ($section in $pages) {
     $b=Button $Nav $section {param($sender,$e) Page $sender.Tag}
     $b.Tag=$section
@@ -562,7 +690,7 @@ foreach ($section in $pages) {
     $b.Content=$line
     [Windows.Automation.AutomationProperties]::SetName($b,$section)
     [Windows.Automation.AutomationProperties]::SetAutomationId($b,"Nav-$section")
-    $b.HorizontalContentAlignment='Left';$b.Foreground='White';$navButtons[$section]=$b
+    $b.Padding='12,7';$b.Margin='0,0,4,4';$b.HorizontalContentAlignment='Left';$b.Foreground='White';$navButtons[$section]=$b
 }
 $win.Add_Closed({
     $timer.Stop()

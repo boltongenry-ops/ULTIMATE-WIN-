@@ -40,7 +40,7 @@ function Startup {
             $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive,$view)
             try {
                 foreach ($leaf in 'Run','RunOnce') {
-                    $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\$leaf")
+                    $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion`$leaf")
                     if (!$key) {continue}
                     try {
                         foreach ($name in $key.GetValueNames()) {
@@ -76,7 +76,7 @@ function RemoveStartup($row) {
     if ($t.Hive -notin 'CurrentUser','LocalMachine' -or $t.View -notin 'Registry32','Registry64' -or $t.Leaf -notin 'Run','RunOnce') {throw 'Неизвестный источник'}
     $base=[Microsoft.Win32.RegistryKey]::OpenBaseKey($t.Hive,$t.View)
     try {
-        $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\$($t.Leaf)",$true)
+        $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion`$($t.Leaf)",$true)
         if (!$key) {throw 'Раздел автозагрузки недоступен'}
         try {
             if ($key.GetValue($row.Название,$null,'DoNotExpandEnvironmentNames') -cne $row.Команда) {throw 'Запись изменилась. Обновите список.'}
@@ -285,4 +285,99 @@ function SwitchStartup($row) {
             } finally {$backup.Dispose()}
         } finally {$live.Dispose()}
     } finally {if ($locked) {$mutex.ReleaseMutex()};$mutex.Dispose()}
+}
+
+function DiskPartitions {
+    $disks=@{}
+    foreach ($d in Get-Disk) {$disks[[int]$d.Number]=$d}
+    foreach ($p in Get-Partition | Sort-Object DiskNumber,Offset) {
+        $d=$disks[[int]$p.DiskNumber]
+        $v=$p | Get-Volume -ErrorAction SilentlyContinue | Select-Object -First 1
+        [pscustomobject]@{
+            Диск=$p.DiskNumber
+            Раздел=$p.PartitionNumber
+            Том=$(if ($p.DriveLetter -match '^[A-Za-z]$') {"$($p.DriveLetter):"})
+            Метка=$v.FileSystemLabel
+            ФС=$v.FileSystem
+            'Размер, ГиБ'=[math]::Round($p.Size/1GB,2)
+            'Свободно, ГиБ'=$(if ($null -ne $v.SizeRemaining) {[math]::Round($v.SizeRemaining/1GB,2)})
+            Тип=$p.Type
+            Накопитель=$d.FriendlyName
+            Схема=[string]$d.PartitionStyle
+        }
+    }
+}
+function DriveHealth {
+    foreach ($d in Get-PhysicalDisk) {
+        $r=$d | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue
+        [pscustomobject]@{
+            Накопитель=$d.FriendlyName
+            Тип=[string]$d.MediaType
+            Шина=[string]$d.BusType
+            'Размер, ГиБ'=[math]::Round($d.Size/1GB,1)
+            Состояние=[string]$d.HealthStatus
+            'Температура, °C'=$r.Temperature
+            'Наработка, ч'=$r.PowerOnHours
+        }
+    }
+}
+function CheckDisk($volume) {
+    if ($volume -notmatch '^[A-Z]:$') {throw 'Выберите раздел с буквой тома'}
+    $drive=[IO.DriveInfo]::new($volume)
+    if (!$drive.IsReady -or $drive.DriveType -notin 'Fixed','Removable') {throw 'Том недоступен для локальной проверки'}
+    # Only the validated volume letter is interpolated into the elevated command.
+    $code=@"
+& "`$env:SystemRoot\System32\chkdsk.exe" '$volume'
+`$result=`$LASTEXITCODE
+Write-Host ''
+Write-Host "CHKDSK · $volume · код `$result"
+[void](Read-Host 'Нажмите Enter для возврата в Ultimate Win')
+exit `$result
+"@
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
+    $p=Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Verb RunAs -ArgumentList "-NoProfile -EncodedCommand $encoded" -PassThru -Wait
+    switch ($p.ExitCode) {
+        0 {"$volume · CHKDSK завершил проверку. Ошибок не обнаружено."}
+        3 {"$volume · Проверка не завершена или обнаруженные ошибки остались неисправленными. См. отчёт CHKDSK."}
+        default {"$volume · Код CHKDSK: $($p.ExitCode). См. отчёт в окне проверки."}
+    }
+}
+function DriverList {
+    Get-CimInstance Win32_PnPSignedDriver -OperationTimeoutSec 30 | Where-Object DeviceName | Select-Object @{n='Устройство';e={$_.DeviceName}},@{n='Класс';e={$_.DeviceClass}},@{n='Версия';e={$_.DriverVersion}},@{n='Поставщик';e={$_.DriverProviderName}},@{n='Дата';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}}},@{n='Подпись';e={if ($_.IsSigned){'Есть'}else{'Нет данных'}}},@{n='INF';e={$_.InfName}} | Sort-Object Устройство
+}
+function InstalledApps {
+    $path='Software\Microsoft\Windows\CurrentVersion\Uninstall'
+    foreach ($hive in 'CurrentUser','LocalMachine') {
+        $views=if ([Environment]::Is64BitOperatingSystem -and $hive -eq 'LocalMachine') {'Registry64','Registry32'} else {'Default'}
+        foreach ($view in $views) {
+            $base=[Microsoft.Win32.RegistryKey]::OpenBaseKey($hive,$view)
+            try {
+                $key=$base.OpenSubKey($path)
+                if (!$key) {continue}
+                try {
+                    foreach ($id in $key.GetSubKeyNames()) {
+                        $entry=$key.OpenSubKey($id)
+                        if (!$entry) {continue}
+                        try {
+                            $name=$entry.GetValue('DisplayName')
+                            if (!$name -or $entry.GetValue('SystemComponent') -eq 1 -or $entry.GetValue('ParentKeyName')) {continue}
+                            $size=$entry.GetValue('EstimatedSize')
+                            $msi=$entry.GetValue('WindowsInstaller') -eq 1 -and $id -match '^\{[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\}$'
+                            [pscustomobject]@{Название=$name;Версия=$entry.GetValue('DisplayVersion');Издатель=$entry.GetValue('Publisher');'Размер, МиБ'=$(if($size -as [long]){[math]::Round([long]$size/1024,1)});Установка=$(if ($hive -eq 'CurrentUser'){'Для меня'}else{'Для всех'});Target=@{Product=$(if ($msi){$id})}}
+                        } finally {$entry.Dispose()}
+                    }
+                } finally {$key.Dispose()}
+            } finally {$base.Dispose()}
+        }
+    }
+}
+function MemoryOverview {
+    $os=Get-CimInstance Win32_OperatingSystem
+    $perf=Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory -ErrorAction SilentlyContinue
+    foreach ($item in @(@('Физическая память',($os.TotalVisibleMemorySize*1KB)),@('Доступно',($os.FreePhysicalMemory*1KB)),@('Кэш системы',$perf.CacheBytes),@('Выделено виртуальной памяти',$perf.CommittedBytes),@('Предел выделения',$perf.CommitLimit),@('Невыгружаемый пул ядра',$perf.PoolNonpagedBytes))) {
+        [pscustomobject]@{Показатель=$item[0];'ГиБ'=$(if ($null -ne $item[1]){[math]::Round($item[1]/1GB,2)})}
+    }
+}
+function MemoryModules {
+    Get-CimInstance Win32_PhysicalMemory | Select-Object @{n='Слот';e={$_.DeviceLocator}},@{n='Объём, ГиБ';e={[math]::Round($_.Capacity/1GB,2)}},@{n='Производитель';e={$_.Manufacturer}},@{n='Модель';e={$_.PartNumber}},@{n='Скорость, MT/s';e={$_.ConfiguredClockSpeed}}
 }

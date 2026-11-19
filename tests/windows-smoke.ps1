@@ -49,12 +49,21 @@ try {
     $autoId=[Windows.Automation.AutomationElement]::AutomationIdProperty
     $status=WaitFor {FindElement $window $autoId 'Status' 'Descendants'} 'status'
     [void](WaitFor {$status.Current.Name -like 'Обновлено в *'} 'dashboard readings')
-    foreach ($page in 'Процессы','Автозагрузка','Устройства','Сеть','Файлы','Диагностика','ИИ-помощник') {
+    foreach ($page in 'Процессы','Автозагрузка','Устройства','Драйверы','Программы','Диски','Память','Сеть','Файлы','Диагностика','ИИ-помощник') {
         $button=FindElement $window $autoId "Nav-$page" 'Descendants'
         $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
         [void](WaitFor {(FindElement $window $autoId 'Heading' 'Descendants').Current.Name -eq $page -and $button.Current.IsEnabled} $page)
         if ($status.Current.Name -like 'Ошибка*') {throw $status.Current.Name}
-        if ($page -in 'Процессы','Автозагрузка','Устройства','Сеть' -and $status.Current.Name -notlike 'Строк:*') {throw "List did not load: $page"}
+        if ($page -in 'Процессы','Автозагрузка','Устройства','Драйверы','Программы','Диски','Память','Сеть' -and $status.Current.Name -notlike 'Строк:*') {throw "List did not load: $page"}
+        if ($page -in 'Драйверы','Программы','Диски','Память' -and $status.Current.Name -notmatch '^Строк: [1-9]') {throw "Empty inventory: $page · $($status.Current.Name)"}
+        if ($page -eq 'Программы') {
+            $search=FindElement $window $autoId 'InventorySearch' 'Descendants'
+            $pattern=$search.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
+            $pattern.SetValue([guid]::NewGuid().ToString())
+            [void](WaitFor {$status.Current.Name -eq 'Строк: 0'} 'filtered inventory')
+            $pattern.SetValue('')
+            [void](WaitFor {$status.Current.Name -match '^Строк: [1-9]'} 'restored inventory')
+        }
         if ($page -eq 'Диагностика') {
             $start=FindElement $window ([Windows.Automation.AutomationElement]::NameProperty) 'Почему тормозит ПК?' 'Descendants'
             $start.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
