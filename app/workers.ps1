@@ -345,6 +345,19 @@ exit `$result
 function DriverList {
     Get-CimInstance Win32_PnPSignedDriver -OperationTimeoutSec 30 | Where-Object DeviceName | Select-Object @{n='Устройство';e={$_.DeviceName}},@{n='Класс';e={$_.DeviceClass}},@{n='Версия';e={$_.DriverVersion}},@{n='Поставщик';e={$_.DriverProviderName}},@{n='Дата';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}}},@{n='Подпись';e={if ($_.IsSigned){'Есть'}else{'Нет данных'}}},@{n='INF';e={$_.InfName}} | Sort-Object Устройство
 }
+function AppUninstaller($command) {
+    if (!$command -or $command -notmatch '^\s*(?:"(?<file>[^"]+\.exe)"|(?<file>[a-z]:\\[^"]*?\.exe))(?:\s+(?<args>.*))?\s*\z') {return}
+    $path=[Environment]::ExpandEnvironmentVariables($Matches.file)
+    $argsText=$Matches.args
+    if ($path -notmatch '^[a-z]:\\' -or ![IO.File]::Exists($path)) {return}
+    $path=[IO.Path]::GetFullPath($path)
+    $allowed=@($env:ProgramFiles,${env:ProgramFiles(x86)},[Environment]::GetFolderPath('LocalApplicationData'))
+    foreach ($dir in $allowed) {
+        if ($dir -and $path.StartsWith($dir.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)) {
+            return @{File=$path;Arguments=$argsText}
+        }
+    }
+}
 function InstalledApps {
     $path='Software\Microsoft\Windows\CurrentVersion\Uninstall'
     foreach ($hive in 'CurrentUser','LocalMachine') {
@@ -363,7 +376,7 @@ function InstalledApps {
                             if (!$name -or $entry.GetValue('SystemComponent') -eq 1 -or $entry.GetValue('ParentKeyName')) {continue}
                             $size=$entry.GetValue('EstimatedSize')
                             $msi=$entry.GetValue('WindowsInstaller') -eq 1 -and $id -match '^\{[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\}$'
-                            [pscustomobject]@{Название=$name;Версия=$entry.GetValue('DisplayVersion');Издатель=$entry.GetValue('Publisher');'Размер, МиБ'=$(if($size -as [long]){[math]::Round([long]$size/1024,1)});Установка=$(if ($hive -eq 'CurrentUser'){'Для меня'}else{'Для всех'});Target=@{Product=$(if ($msi){$id})}}
+                            [pscustomobject]@{Название=$name;Версия=$entry.GetValue('DisplayVersion');Издатель=$entry.GetValue('Publisher');'Размер, МиБ'=$(if($size -as [long]){[math]::Round([long]$size/1024,1)});Установка=$(if ($hive -eq 'CurrentUser'){'Для меня'}else{'Для всех'});Target=@{Product=$(if ($msi){$id});Wizard=(AppUninstaller $entry.GetValue('UninstallString'))}}
                         } finally {$entry.Dispose()}
                     }
                 } finally {$key.Dispose()}

@@ -150,6 +150,7 @@ function Fill($items) {
             [void]$grid.Columns.Add($col)
         }
     }
+    if ($searchBox) {$script:inventory=$data}
     $grid.ItemsSource=$data
     $Status.Text="Строк: $($data.Count)"
     if ($searchBox -and $searchBox.Text) {FilterTable}
@@ -261,22 +262,18 @@ function SearchTable {
     [Windows.Automation.AutomationProperties]::SetAutomationId($searchBox,'InventorySearch')
     $searchBox.Width=260;$searchBox.Margin='0,0,0,7'
     [void]$r.Children.Add($searchBox)
-    $searchBox.Add_TextChanged({if ($grid.ItemsSource) {FilterTable}})
+    $searchBox.Add_TextChanged({FilterTable})
 }
 function FilterTable {
     $term=$searchBox.Text.Trim()
-    $view=[Windows.Data.CollectionViewSource]::GetDefaultView($grid.ItemsSource)
-    if (!$view -or !$view.CanFilter) {return}
-    if (!$term) {$view.Filter=$null} else {
-        $filter={param($row)
-            foreach ($prop in $row.PSObject.Properties) {
-                if ($prop.Name -ne 'Target' -and ([string]$prop.Value).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {return $true}
+    if (!$term) {$grid.ItemsSource=$inventory} else {
+        $grid.ItemsSource=@(foreach ($entry in $inventory) {
+            foreach ($field in $entry.PSObject.Properties) {
+                if ($field.Name -ne 'Target' -and ([string]$field.Value).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {$entry;break}
             }
-            return $false
-        }.GetNewClosure()
-        $view.Filter=[Predicate[object]]$filter
+        })
     }
-    $Status.Text="Строк: $($view.Count)"
+    $Status.Text="Строк: $($grid.Items.Count)"
 }
 function Dashboard {
     $script:nextRefresh=[DateTime]::MaxValue
@@ -476,6 +473,7 @@ function ExplainSelection {
 }
 function Page($name) {
     if ($script:active -eq 'ИИ-помощник') {RememberChat}
+    $script:inventory=@()
     $script:searchBox=$null
     $script:active=$name; $Heading.Text=$name
     $Controls.Children.Clear();$Body.Children.Clear();$Status.Text=''
@@ -567,6 +565,11 @@ function Page($name) {
                 if ($product -match '^\{[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\}$') {
                     if (Confirm "Открыть мастер удаления «$($row.Название)»?") {
                         Run 'param($id) $p=Start-Process "$env:SystemRoot\System32\msiexec.exe" -ArgumentList "/x $id" -PassThru -Wait; if ($p.ExitCode -notin 0,3010,1602){throw "Код Windows Installer: $($p.ExitCode)"}; InstalledApps | Sort-Object Название' @($product) {param($rows) Fill $rows}
+                    }
+                } elseif ($row.Target.Wizard -and !([Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+                    $wizard=$row.Target.Wizard
+                    if (Confirm "Запустить мастер удаления «$($row.Название)»?`n$($wizard.File)") {
+                        Run 'param($wizard) $info=[Diagnostics.ProcessStartInfo]::new($wizard.File,[string]$wizard.Arguments); $info.UseShellExecute=$true; $p=[Diagnostics.Process]::Start($info); try {$p.WaitForExit(); if ($p.ExitCode -ne 0){throw "Мастер завершился с кодом $($p.ExitCode)"}} finally {$p.Dispose()}; InstalledApps | Sort-Object Название' @($wizard) {param($rows) Fill $rows}
                     }
                 } elseif (Confirm "Открыть установленные приложения Windows для удаления «$($row.Название)»? Выберите программу в системном списке.") {
                     Start-Process 'ms-settings:appsfeatures'
