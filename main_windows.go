@@ -31,7 +31,7 @@ func main() {
 		}
 	}
 	shell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
-	cmd := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-Command", "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); & ([ScriptBlock]::Create([Console]::In.ReadToEnd()))")
+	cmd := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-Command", "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); . ([ScriptBlock]::Create([Console]::In.ReadToEnd()))")
 	cmd.Stdin = &script
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	if out, err := cmd.CombinedOutput(); err != nil {

@@ -84,7 +84,13 @@ function Run($code,$arguments,$done) {
     foreach ($argValue in $arguments) {[void]$ps.AddArgument($argValue)}
     $Status.Text='Выполняется…'
     $Nav.IsEnabled=$false; $Controls.IsEnabled=$false; $Body.IsEnabled=$false
-    $script:job=@{ps=$ps;handle=$ps.BeginInvoke();done=$done}
+    try {
+        $script:job=@{ps=$ps;handle=$ps.BeginInvoke();done=$done}
+    } catch {
+        $ps.Dispose()
+        $Nav.IsEnabled=$true; $Controls.IsEnabled=$true; $Body.IsEnabled=$true
+        $Status.Text="Не удалось запустить запрос: $($_.Exception.GetBaseException().Message)"
+    }
 }
 $timer=New-Object Windows.Threading.DispatcherTimer
 $timer.Interval=[TimeSpan]::FromMilliseconds(200)
@@ -108,7 +114,7 @@ function Confirm($text) {
     [Windows.MessageBox]::Show($win,$text,'Ultimate Win','YesNo','Question','No') -eq 'Yes'
 }
 function Dashboard {
-    $script:nextRefresh=[DateTime]::UtcNow.AddSeconds(5)
+    $script:nextRefresh=[DateTime]::MaxValue
     Run 'Metrics' @() {param($rows)
         $m=$rows[0]
         $Body.Children.Clear()
@@ -127,6 +133,7 @@ function Dashboard {
         }
         [void](Label $stack $m.OS 20)
         [void](Label $stack "С момента загрузки: $($m.Uptime)" 14)
+        $script:nextRefresh=[DateTime]::UtcNow.AddSeconds(5)
         $Status.Text="Обновлено в $(Get-Date -Format HH:mm:ss)"
     }
 }
@@ -332,6 +339,11 @@ foreach ($section in $pages) {
 $win.Add_Closed({
     $timer.Stop()
     foreach ($p in $paused.Values) {try {if (!$p.HasExited) {[void][PauseControl]::NtResumeProcess($p.Handle)}} finally {$p.Dispose()}}
+})
+$win.Dispatcher.Add_UnhandledException({
+    param($sender,$eventArgs)
+    $eventArgs.Handled=$true
+    $Status.Text="Ошибка интерфейса: $($eventArgs.Exception.GetBaseException().Message)"
 })
 $timer.Start()
 Page 'Обзор'

@@ -1,14 +1,14 @@
 $ErrorActionPreference='Stop'
 
 function Metrics {
-    $os = Get-CimInstance Win32_OperatingSystem
-    $cpu = @(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor | Where-Object Name -eq '_Total')[0]
-    $gpu = @(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory -ErrorAction SilentlyContinue)
+    $os = Get-CimInstance Win32_OperatingSystem -OperationTimeoutSec 8
+    $cpu = @(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'" -OperationTimeoutSec 8 -ErrorAction SilentlyContinue)[0]
+    $gpu = @(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory -OperationTimeoutSec 8 -ErrorAction SilentlyContinue)
     $ram = ($os.TotalVisibleMemorySize - $os.FreePhysicalMemory) / 1MB
     $vram = 'Нет данных драйвера'
     if ($gpu.Count) { $vram = '{0:N2} ГиБ' -f (($gpu | Measure-Object DedicatedUsage -Sum).Sum / 1GB) }
     [pscustomobject]@{
-        CPU = ('{0} %' -f $cpu.PercentProcessorTime)
+        CPU = if ($null -ne $cpu.PercentProcessorTime) {'{0} %' -f $cpu.PercentProcessorTime} else {'Нет данных'}
         RAM = ('{0:N1} / {1:N1} ГиБ' -f $ram, ($os.TotalVisibleMemorySize / 1MB))
         VRAM = $vram
         OS = "$($os.Caption) · $($os.Version)"

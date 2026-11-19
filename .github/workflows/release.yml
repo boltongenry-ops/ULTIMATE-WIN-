@@ -12,4 +12,4 @@ jobs:
       - name: Publish the tagged Windows build
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/UltimateWin.exe --verify-tag --title "Ultimate Win $GITHUB_REF_NAME" --notes "Приложение для Windows x64 с поддержкой OpenCode Go."
+        run: gh release create "$GITHUB_REF_NAME" dist/UltimateWin.exe "dist/UltimateWin-${GITHUB_REF_NAME#v}-win-x64.zip" --verify-tag --title "Ultimate Win $GITHUB_REF_NAME" --notes "Приложение для Windows x64 с поддержкой OpenCode Go."
