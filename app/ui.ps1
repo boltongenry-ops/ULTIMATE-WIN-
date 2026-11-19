@@ -1,4 +1,4 @@
-Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Windows.Forms
+Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Windows.Forms,System.Drawing
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -18,14 +18,32 @@ public static class PauseControl {
 <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="8,5"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
 </Window.Resources>
 <Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-<Border Background="{DynamicResource Sidebar}" CornerRadius="18" Padding="14,22" BorderThickness="1" BorderBrush="{DynamicResource Edge}"><DockPanel><Button Name="ThemeSwitch" DockPanel.Dock="Bottom" Margin="2,12,2,0"/><StackPanel><TextBlock Text="Ultimate Win" FontWeight="SemiBold" FontSize="25" Foreground="White" Margin="6,0,0,32"/><StackPanel Name="Nav"/></StackPanel></DockPanel></Border>
+<Border Background="{DynamicResource Sidebar}" CornerRadius="18" Padding="14,22" BorderThickness="1" BorderBrush="{DynamicResource Edge}"><DockPanel><Button Name="ThemeSwitch" DockPanel.Dock="Bottom" Margin="2,12,2,0"/><StackPanel><StackPanel Orientation="Horizontal" Margin="0,0,0,24"><Image Name="BrandIcon" Width="36" Height="36"/><TextBlock Text="Ultimate Win" FontWeight="SemiBold" FontSize="20" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/></StackPanel><StackPanel Name="Nav"/></StackPanel></DockPanel></Border>
 <Border Grid.Column="1" Margin="12,0,0,0" Background="{DynamicResource Glass}" BorderBrush="{DynamicResource Edge}" BorderThickness="1" CornerRadius="18" Padding="24"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <TextBlock Name="Heading" FontSize="30" FontWeight="SemiBold"/><TextBlock Name="Hint" Grid.Row="1" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Margin="0,6,0,18"/>
 <StackPanel Name="Controls" Grid.Row="2"/><Grid Name="Body" Grid.Row="3" Margin="0,5"/>
-<TextBlock Name="Status" Grid.Row="4" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Muted}"/></Grid></Border></Grid></Window>
+<DockPanel Grid.Row="4"><Button DockPanel.Dock="Right" Name="CancelRead" Content="Отменить" Visibility="Collapsed"/><TextBlock Name="Status" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Muted}"/></DockPanel></Grid></Border></Grid></Window>
 '@
 $win=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new($layout))
 foreach ($name in 'Heading','Hint','Controls','Body','Status','Nav') {Set-Variable -Name $name -Value $win.FindName($name)}
+if ($env:ULTIMATEWIN_EXE) {
+    $icon=[Drawing.Icon]::ExtractAssociatedIcon($env:ULTIMATEWIN_EXE)
+    if ($icon) {
+        try {
+            $source=[Windows.Interop.Imaging]::CreateBitmapSourceFromHIcon($icon.Handle,[Windows.Int32Rect]::Empty,[Windows.Media.Imaging.BitmapSizeOptions]::FromEmptyOptions())
+            $source.Freeze()
+            $win.Icon=$source
+            $win.FindName('BrandIcon').Source=$source
+        } finally {$icon.Dispose()}
+    }
+}
+$cancelRead=$win.FindName('CancelRead')
+$cancelRead.Add_Click({
+    if (!$job -or !$job.Cancellable -or $job.StopHandle) {return}
+    $job.StopHandle=$job.ps.BeginStop($null,$null)
+    $cancelRead.IsEnabled=$false
+    $Status.Text='Останавливаем проверку…'
+})
 $themeFile=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'UltimateWin/theme.txt'
 function SetTheme($dark) {
     $script:darkTheme=[bool]$dark
@@ -121,7 +139,7 @@ function Fill($items) {
     $grid.ItemsSource=$data
     $Status.Text="Строк: $($data.Count)"
 }
-function Run($code,$arguments,$done) {
+function Run($code,$arguments,$done,$operation='') {
     if ($script:job) {return}
     $ps=[PowerShell]::Create()
     [void]$ps.AddScript($workerSource).AddStatement().AddScript($code)
@@ -129,7 +147,8 @@ function Run($code,$arguments,$done) {
     $Status.Text='Выполняется…'
     $Nav.IsEnabled=$false; $Controls.IsEnabled=$false; $Body.IsEnabled=$false
     try {
-        $script:job=@{ps=$ps;handle=$ps.BeginInvoke();done=$done}
+        $script:job=@{ps=$ps;handle=$ps.BeginInvoke();done=$done;Cancellable=[bool]$operation;Operation=$operation;Started=[Diagnostics.Stopwatch]::StartNew()}
+        if ($operation) {$cancelRead.IsEnabled=$true;$cancelRead.Visibility='Visible';$Status.Text=$operation}
     } catch {
         $ps.Dispose()
         $Nav.IsEnabled=$true; $Controls.IsEnabled=$true; $Body.IsEnabled=$true
@@ -143,10 +162,19 @@ $timer.Add_Tick({
         if ($win.IsVisible -and $win.IsActive -and $active -eq 'Обзор' -and [DateTime]::UtcNow -ge $nextRefresh) {Dashboard}
         return
     }
-    if (!$job.handle.IsCompleted) {return}
+    if (!$job.handle.IsCompleted -or ($job.StopHandle -and !$job.StopHandle.IsCompleted)) {
+        if ($job.Cancellable -and !$job.StopHandle) {$Status.Text="$($job.Operation) · $([int]$job.Started.Elapsed.TotalSeconds) с"}
+        return
+    }
+    $cancelRead.Visibility='Collapsed'
     $finished=$job; $script:job=$null
     $Nav.IsEnabled=$true; $Controls.IsEnabled=$true; $Body.IsEnabled=$true
     try {
+        if ($finished.StopHandle) {
+            $finished.ps.EndStop($finished.StopHandle)
+            $Status.Text='Проверка отменена'
+            return
+        }
         $response=@($finished.ps.EndInvoke($finished.handle))
         
         $Status.Text='Готово'
@@ -219,7 +247,7 @@ function ProcessAction($action) {
 function FileScan {
     $script:scanRoot=$root; $script:scanMode=$mode
     $grid.ItemsSource=$null
-    Run 'param($r,$m) Scan $r $m' @($root,$mode) {param($rows) Fill $rows}
+    Run 'param($r,$m) Scan $r $m' @($root,$mode) {param($rows) Fill $rows} 'Сканирование папки'
 }
 function Elevated($exe,$argsText) {
     Run 'param($exe,$a) $p=Start-Process -FilePath $exe -ArgumentList $a -Verb RunAs -PassThru -Wait; if($p.ExitCode -ne 0){throw "Код завершения: $($p.ExitCode)"}' @($exe,$argsText) {ActionResult 'Команда завершена, код 0'}
@@ -336,6 +364,18 @@ function SendChat {
         ShowConversation
     }
 }
+function ExplainSelection {
+    $entry=$grid.SelectedItem
+    if (!$entry) {$Status.Text='Выберите строку для объяснения';return}
+    $fields=foreach ($field in $entry.PSObject.Properties) {
+        if ($field.Name -notin 'Target','Stamp','Guid','Команда') {"$($field.Name): $($field.Value)"}
+    }
+    $question="Объясни запись из раздела «$active» и предложи следующий шаг.`n"+($fields -join "`n")
+    if ($draft -and !(Confirm 'Заменить текущий черновик вопросом о выбранной записи?')) {return}
+    $script:draft=$question
+    Page 'ИИ-помощник'
+    $Status.Text='Проверьте текст перед отправкой'
+}
 function Page($name) {
     if ($script:active -eq 'ИИ-помощник') {RememberChat}
     $script:active=$name; $Heading.Text=$name
@@ -344,6 +384,9 @@ function Page($name) {
         $entry.Value.Background=if ($entry.Key -eq $name){'#206A78'}else{'#1B374F'}
     }
     $r=Row
+    if ($name -in 'Процессы','Автозагрузка','Устройства') {
+        [void](Button $r 'Объяснить' {ExplainSelection})
+    }
     switch ($name) {
         'Обзор' {
             $Hint.Text='Текущая нагрузка и ресурсы компьютера · обновление каждые 5 секунд'
@@ -362,9 +405,19 @@ function Page($name) {
         'Автозагрузка' {
             $Hint.Text='Команды, зарегистрированные для запуска при входе в Windows'
             [void](Button $r 'Обновить' {Page 'Автозагрузка'})
+            [void](Button $r 'Включить / отключить' {
+                $entry=$grid.SelectedItem
+                if (!$entry) {$Status.Text='Выберите запись автозагрузки';return}
+                $verb=if ($entry.Target.Disabled) {'Включить'} else {'Отключить'}
+                if (Confirm "$verb «$($entry.Название)» при входе в Windows?") {
+                    Run 'param($row) SwitchStartup $row; Startup' @($entry) {param($rows) Fill $rows}
+                }
+            })
+            [void](Button $r 'Параметры Windows' {Start-Process 'ms-settings:startupapps'})
             [void](Button $r 'Удалить из автозагрузки' {
                 $entry=$grid.SelectedItem
                 if (!$entry) {$Status.Text='Выберите запись автозагрузки';return}
+                if ($entry.Target.Disabled) {$Status.Text='Для удаления сначала восстановите запись';return}
                 $effect=if ($entry.Target.Folder) {'Элемент папки автозагрузки будет перемещён в корзину.'} else {'Будет удалена команда запуска из реестра.'}
                 if (Confirm "Удалить «$($entry.Название)» из автозагрузки?`n$($entry.Пользователь) · $($entry.Источник)`n$effect") {
                     Run 'param($entry) RemoveStartup $entry; Startup' @($entry) {param($rows) Fill $rows; $Status.Text='Запись удалена из автозагрузки'}
@@ -383,7 +436,7 @@ function Page($name) {
                 $dlg=New-Object Windows.Forms.FolderBrowserDialog
                 try {if ($dlg.ShowDialog() -eq 'OK') {$script:root=$dlg.SelectedPath;$script:mode='size';Page 'Файлы'}} finally {$dlg.Dispose()}
             })
-            foreach ($choice in @(@('Размеры','size'),@('Дубли','dup'),@('Пустые','empty'),@('TEMP','temp'))) {
+            foreach ($choice in @(@('По папкам','folders'),@('Размеры','size'),@('Дубли','dup'),@('Пустые','empty'),@('TEMP','temp'))) {
                 $btn=Button $r $choice[0] {param($sender,$e)
                     $script:mode=$sender.Tag
                     if ($mode -eq 'temp') {$script:root=[IO.Path]::GetTempPath()}
@@ -395,7 +448,7 @@ function Page($name) {
             $script:folderLabel=Label $Controls $root 14
             [void](Button (Row) 'Удалить выбранное' {
                 $selected=$grid.SelectedItem
-                if (!$selected -or $scanMode -eq 'size') {$Status.Text='Выберите строку в результатах поиска дублей, пустышек или TEMP';return}
+                if (!$selected -or $scanMode -in 'size','folders') {$Status.Text='Выберите строку в результатах поиска дублей, пустышек или TEMP';return}
                 $prompt=if ($selected.Тип -eq 'Пустая папка') {'Удалить пустую папку без корзины?'}else{'Переместить файл в корзину?'}
                 if (Confirm "$prompt`n$($selected.Путь)") {
                     Run 'param($row,$r,$m) Recycle $row $r $m' @($selected,$scanRoot,$scanMode) {FileScan}
@@ -406,10 +459,13 @@ function Page($name) {
         'Сеть' {
             $Hint.Text='Скорость передачи данных по активным интерфейсам за последний интервал измерения'
             [void](Button $r 'Измерить' {Page 'Сеть'})
+            [void](Button $r 'Проверить соединение' {
+                Run 'NetworkChecks' @() {param($rows) Fill $rows} 'Проверяем шлюз, DNS и HTTPS'
+            })
             [void](Button $r 'Очистить DNS' {Action 'dns'})
             [void](Button $r 'Перезапустить адаптер' {
                 $item=$grid.SelectedItem
-                if (!$item) {$Status.Text='Выберите сетевой адаптер';return}
+                if (!$item.Guid) {$Status.Text='Нажмите «Измерить» и выберите сетевой адаптер';return}
                 if (Confirm "Перезапустить адаптер $($item.Адаптер)? Соединение временно прервётся.") {
                     $guid=([guid]$item.Guid).ToString()
                     $command="`$ErrorActionPreference='Stop'; `$n=Get-NetAdapter | Where-Object { `$_.InterfaceGuid -eq [guid]'$guid' }; if (!`$n) {throw 'Adapter unavailable'}; `$n | Restart-NetAdapter -Confirm:`$false -ErrorAction Stop"
@@ -419,7 +475,11 @@ function Page($name) {
             Table;Run 'Network' @() {param($rows) Fill $rows}
         }
         'Диагностика' {
-            $Hint.Text='Windows проверит целостность защищённых системных файлов. Результат выводится в окне SFC и записывается в журнал CBS.'
+            $Hint.Text='Измерьте нагрузку процессора, диска и памяти или проверьте целостность системных файлов Windows.'
+            [void](Button $r 'Почему тормозит ПК?' {
+                Run 'LoadSample' @() {param($rows) Fill $rows; $Status.Text='Измерение завершено. Для подробностей откройте раздел «Процессы».'} 'Измеряем нагрузку около 30 секунд'
+            })
+            Table
             [void](Button $r 'Проверить систему' {Action 'verify'})
             [void](Button $r 'Открыть журнал CBS' {
                 try {Start-Process "$env:SystemRoot\System32\notepad.exe" -ArgumentList ('"'+$env:SystemRoot+'\Logs\CBS\CBS.log"')} catch {$Status.Text=$_.Exception.Message}
@@ -485,8 +545,18 @@ function Page($name) {
         }
     }
 }
+$glyphs=@('E80F','E950','E7E8','E772','E8B7','E774','E9D9','E8F2')
 foreach ($section in $pages) {
-    $b=Button $Nav $section {param($sender,$e) Page $sender.Content}
+    $b=Button $Nav $section {param($sender,$e) Page $sender.Tag}
+    $b.Tag=$section
+    $line=New-Object Windows.Controls.StackPanel;$line.Orientation='Horizontal'
+    $mark=New-Object Windows.Controls.TextBlock;$mark.FontFamily='Segoe MDL2 Assets';$mark.VerticalAlignment='Center'
+    $mark.Text=[char][Convert]::ToInt32($glyphs[[Array]::IndexOf($pages,$section)],16);$mark.Margin='0,0,10,0'
+    [void]$line.Children.Add($mark)
+    $caption=New-Object Windows.Controls.TextBlock;$caption.Text=$section;[void]$line.Children.Add($caption)
+    $b.Content=$line
+    [Windows.Automation.AutomationProperties]::SetName($b,$section)
+    [Windows.Automation.AutomationProperties]::SetAutomationId($b,"Nav-$section")
     $b.HorizontalContentAlignment='Left';$b.Foreground='White';$navButtons[$section]=$b
 }
 $win.Add_Closed({

@@ -30,6 +30,7 @@ function Processes {
     }
 }
 function Startup {
+    DisabledStartup
     $views = if ([Environment]::Is64BitOperatingSystem) {'Registry64','Registry32'} else {'Registry32'}
     foreach ($hive in 'CurrentUser','LocalMachine') {
         $owner = if ($hive -eq 'CurrentUser') {'Текущий пользователь'} else {'Все пользователи'}
@@ -113,6 +114,7 @@ function Scan($root,$mode) {
     $base=SafePath $root
     $stack=New-Object 'Collections.Generic.Stack[string]'
     $stack.Push($base.FullName)
+    $sizes=@{}
     $groups=@{}
     $results=New-Object Collections.ArrayList
     while ($stack.Count) {
@@ -124,6 +126,13 @@ function Scan($root,$mode) {
                 if ($mode -eq 'empty' -and !@(Get-ChildItem -LiteralPath $item.FullName -Force -ErrorAction SilentlyContinue -ErrorVariable listingErrors).Count -and !$listingErrors) {
                     [void]$results.Add([pscustomobject]@{Путь=$item.FullName; Байт=0; Тип='Пустая папка'})
                 }
+                continue
+            }
+            if ($mode -eq 'folders') {
+                $relative=$item.FullName.Substring($base.FullName.TrimEnd([IO.Path]::DirectorySeparatorChar).Length+1)
+                $parts=$relative.Split([char[]]@([IO.Path]::DirectorySeparatorChar),2)
+                $bucket=if ($parts.Length -gt 1){$parts[0]}else{'(файлы в корне)'}
+                $sizes[$bucket]+=[long]$item.Length
                 continue
             }
             if ($mode -eq 'dup') {
@@ -145,6 +154,11 @@ function Scan($root,$mode) {
                 if (!$seen.ContainsKey($hash)) {$seen[$hash]=$f.FullName; continue}
                 [void]$results.Add([pscustomobject]@{Путь=$f.FullName; Байт=$f.Length; Оригинал=$seen[$hash]})
             }
+        }
+    }
+    if ($mode -eq 'folders') {
+        foreach ($key in $sizes.Keys) {
+            [void]$results.Add([pscustomobject]@{Размещение=$key;Байт=$sizes[$key];'МиБ'=[math]::Round($sizes[$key]/1MB,2)})
         }
     }
     $results | Sort-Object Байт -Descending
@@ -190,4 +204,85 @@ function Api($endpoint,$key,$model,$history,$list,$sessionId) {
         if (!$answer.choices[0].message.content) {throw 'Провайдер вернул пустой ответ'}
         $answer.choices[0].message.content
     }
+}
+
+function LoadSample {
+    $samples=@()
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        $cpu=Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'" -OperationTimeoutSec 4 -ErrorAction SilentlyContinue
+        $disk=Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk -Filter "Name='_Total'" -OperationTimeoutSec 4 -ErrorAction SilentlyContinue
+        $os=Get-CimInstance Win32_OperatingSystem -OperationTimeoutSec 4
+        $samples += [pscustomobject]@{
+            CPU=$cpu.PercentProcessorTime
+            Disk=if ($null -ne $disk.PercentIdleTime) {100-[math]::Min(100,$disk.PercentIdleTime)}
+            RAM=100*(1-$os.FreePhysicalMemory/$os.TotalVisibleMemorySize)
+        }
+        if ($clock.Elapsed.TotalSeconds -lt 30) {Start-Sleep -Milliseconds 1500}
+    } while ($clock.Elapsed.TotalSeconds -lt 30)
+    foreach ($metric in @(@('CPU','Процессор',85),@('Disk','Активность диска',90),@('RAM','Занятая память',90))) {
+        $values=@($samples | ForEach-Object {$_.$($metric[0])} | Where-Object {$null -ne $_})
+        $avg=($values | Measure-Object -Average).Average
+        [pscustomobject]@{Ресурс=$metric[1];'Среднее, %'=if ($values.Count){[math]::Round($avg,1)};Замеров=$values.Count;Оценка=if (!$values.Count){'Нет показаний'} elseif ($avg -ge $metric[2]){'Высокая нагрузка во время проверки'}else{'Среднее в пределах порога'}}
+    }
+}
+function NetworkChecks {
+    $routes=@([Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object {$_.OperationalStatus -eq 'Up' -and $_.GetIPProperties().GatewayAddresses.Count})
+    [pscustomobject]@{Проверка='Маршрут';Результат=if ($routes.Count){($routes.Name -join ', ')}else{'Активный интерфейс со шлюзом не найден'}}
+    if ($routes.Count) {
+        $gateway=$routes[0].GetIPProperties().GatewayAddresses[0].Address
+        $ping=[Net.NetworkInformation.Ping]::new()
+        try {$state=$ping.Send($gateway,1500).Status.ToString()} catch {$state=$_.Exception.GetBaseException().Message} finally {$ping.Dispose()}
+        [pscustomobject]@{Проверка="Шлюз $gateway (ICMP)";Результат=$state}
+    }
+    $site='www.microsoft.com'
+    try {
+        $lookup=[Net.Dns]::GetHostAddressesAsync($site)
+        if (!$lookup.Wait(5000)) {throw 'Истекло время ожидания'}
+        $dns=($lookup.Result.IPAddressToString -join ', ')
+    } catch {$dns=$_.Exception.GetBaseException().Message}
+    [pscustomobject]@{Проверка="DNS · $site";Результат=$dns}
+    try {
+        $res=Invoke-WebRequest "https://$site/" -UseBasicParsing -Method Head -TimeoutSec 8
+        $https="HTTP $([int]$res.StatusCode)"
+    } catch {$https=$_.Exception.GetBaseException().Message}
+    [pscustomobject]@{Проверка="HTTPS · $site";Результат=$https}
+}
+
+function DisabledStartup {
+    $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\UltimateWin\DisabledRun')
+    if (!$key) {return}
+    try {
+        foreach ($name in $key.GetValueNames()) {
+            [pscustomobject]@{Название=$name;Команда=$key.GetValue($name,$null,'DoNotExpandEnvironmentNames');Источник='Отключено в Ultimate Win';Пользователь='Текущий пользователь';Target=@{Disabled=$true}}
+        }
+    } finally {$key.Dispose()}
+}
+function SwitchStartup($row) {
+    $t=$row.Target
+    if (!$t.Disabled -and ($t.Hive -ne 'CurrentUser' -or $t.Leaf -ne 'Run')) {throw 'Переключатель доступен для постоянных команд текущего пользователя. Другими приложениями можно управлять в параметрах Windows.'}
+    # Both locations belong to the same user. Never restore user data into HKLM.
+    $mutex=[Threading.Mutex]::new($false,'Local\UltimateWin-StartupSwitch')
+    try {
+        try {$locked=$mutex.WaitOne(3000)} catch [Threading.AbandonedMutexException] {$locked=$true}
+        if (!$locked) {throw 'Автозагрузка занята другим экземпляром приложения'}
+        $live=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
+        try {
+            $backup=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\UltimateWin\DisabledRun')
+            try {
+                $from=$live;$to=$backup
+                if ($t.Disabled) {$from=$backup;$to=$live}
+                $name=$row.Название
+                $value=$from.GetValue($name,$null,'DoNotExpandEnvironmentNames')
+                if ($null -eq $value -or $value -cne $row.Команда) {throw 'Запись изменилась. Обновите список.'}
+                $kind=$from.GetValueKind($name)
+                if ($kind -notin 'String','ExpandString') {throw 'Неизвестный тип команды'}
+                $existing=$to.GetValue($name,$null,'DoNotExpandEnvironmentNames')
+                if ($null -ne $existing -and ($existing -cne $value -or $to.GetValueKind($name) -ne $kind)) {throw 'Уже существует другая запись с этим именем'}
+                $to.SetValue($name,$value,$kind)
+                $to.Flush()
+                $from.DeleteValue($name)
+            } finally {$backup.Dispose()}
+        } finally {$live.Dispose()}
+    } finally {if ($locked) {$mutex.ReleaseMutex()};$mutex.Dispose()}
 }

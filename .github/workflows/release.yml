@@ -1,11 +1,27 @@
 name: Publish Windows release
 on:
   push:
+    branches: [main]
     tags: ['v*']
 permissions:
-  contents: write
+  contents: read
 jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the packaged application on Windows
+        shell: powershell
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {throw 'Tag must match VERSION'}
+          ./tests/windows-smoke.ps1 -Archive "dist/UltimateWin-$version-win-x64.zip"
   publish:
+    if: github.ref_type == 'tag'
+    needs: verify
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
