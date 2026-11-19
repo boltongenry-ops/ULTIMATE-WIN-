@@ -30,7 +30,58 @@ function Processes {
     }
 }
 function Startup {
-    Get-CimInstance Win32_StartupCommand | Select-Object @{n='Название';e={$_.Name}},@{n='Команда';e={$_.Command}},@{n='Источник';e={$_.Location}},@{n='Пользователь';e={$_.User}}
+    $views = if ([Environment]::Is64BitOperatingSystem) {'Registry64','Registry32'} else {'Registry32'}
+    foreach ($hive in 'CurrentUser','LocalMachine') {
+        $owner = if ($hive -eq 'CurrentUser') {'Текущий пользователь'} else {'Все пользователи'}
+        foreach ($view in $views) {
+            # HKCU Run is shared between registry views.
+            if ($hive -eq 'CurrentUser' -and $view -ne @($views)[0]) {continue}
+            $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive,$view)
+            try {
+                foreach ($leaf in 'Run','RunOnce') {
+                    $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\$leaf")
+                    if (!$key) {continue}
+                    try {
+                        foreach ($name in $key.GetValueNames()) {
+                            if (!$name -or $key.GetValueKind($name) -notin 'String','ExpandString') {continue}
+                            $command=$key.GetValue($name,$null,'DoNotExpandEnvironmentNames')
+                            [pscustomobject]@{Название=$name;Команда=$command;Источник="$leaf · $view";Пользователь=$owner;Target=@{Hive=$hive;View=$view;Leaf=$leaf}}
+                        }
+                    } finally {$key.Dispose()}
+                }
+            } finally {$base.Dispose()}
+        }
+    }
+    foreach ($special in 'Startup','CommonStartup') {
+        $folder=[Environment]::GetFolderPath($special)
+        if (!$folder -or !(Test-Path -LiteralPath $folder)) {continue}
+        foreach ($f in Get-ChildItem -LiteralPath $folder -File -Force) {
+            if ($f.Name -eq 'desktop.ini' -or ($f.Attributes -band [IO.FileAttributes]::ReparsePoint)) {continue}
+            [pscustomobject]@{Название=$f.Name;Команда=$f.FullName;Источник='Папка автозагрузки';Пользователь=if($special -eq 'Startup'){'Текущий пользователь'}else{'Все пользователи'};Target=@{Folder=$special;Stamp=$f.LastWriteTimeUtc.Ticks;Length=$f.Length}}
+        }
+    }
+}
+function RemoveStartup($row) {
+    $t=$row.Target
+    if ($t.Folder -in 'Startup','CommonStartup') {
+        $folder=SafePath ([Environment]::GetFolderPath($t.Folder))
+        if ([IO.Path]::GetFileName($row.Название) -cne $row.Название) {throw 'Недопустимое имя файла'}
+        $file=SafePath ([IO.Path]::Combine($folder.FullName,$row.Название))
+        if ($file -isnot [IO.FileInfo] -or $file.FullName -ne $row.Команда -or $file.DirectoryName -ne $folder.FullName -or $file.LastWriteTimeUtc.Ticks -ne $t.Stamp -or $file.Length -ne $t.Length) {throw 'Запись изменилась. Обновите список.'}
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($file.FullName,'OnlyErrorDialogs','SendToRecycleBin','ThrowException')
+        return
+    }
+    if ($t.Hive -notin 'CurrentUser','LocalMachine' -or $t.View -notin 'Registry32','Registry64' -or $t.Leaf -notin 'Run','RunOnce') {throw 'Неизвестный источник'}
+    $base=[Microsoft.Win32.RegistryKey]::OpenBaseKey($t.Hive,$t.View)
+    try {
+        $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\$($t.Leaf)",$true)
+        if (!$key) {throw 'Раздел автозагрузки недоступен'}
+        try {
+            if ($key.GetValue($row.Название,$null,'DoNotExpandEnvironmentNames') -cne $row.Команда) {throw 'Запись изменилась. Обновите список.'}
+            $key.DeleteValue($row.Название)
+        } finally {$key.Dispose()}
+    } finally {$base.Dispose()}
 }
 function Devices {
     Get-CimInstance Win32_PnPEntity -Filter 'Present = TRUE' | Select-Object @{n='Устройство';e={$_.Name}},@{n='Класс';e={$_.PNPClass}},@{n='Статус';e={$_.Status}},@{n='Код ошибки';e={$_.ConfigManagerErrorCode}}

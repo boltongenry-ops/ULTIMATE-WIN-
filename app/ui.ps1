@@ -8,20 +8,60 @@ public static class PauseControl {
 }
 '@
 [xml]$layout=@'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ultimate Win" Width="1120" Height="730" MinWidth="900" MinHeight="590" WindowStartupLocation="CenterScreen" FontFamily="Segoe UI" Background="#F3F6FA" Foreground="#182C44">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ultimate Win" Width="1120" Height="730" MinWidth="900" MinHeight="590" WindowStartupLocation="CenterScreen" FontFamily="Segoe UI" Background="{DynamicResource Backdrop}" Foreground="{DynamicResource Ink}">
 <Window.Resources>
-<Style TargetType="Button"><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#193856"/><Setter Property="Padding" Value="14,9"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="box" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}" BorderBrush="#C5D4DF" BorderThickness="1"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="box" Property="Opacity" Value=".78"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="box" Property="Opacity" Value=".45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
-<Style TargetType="TextBox"><Setter Property="Padding" Value="8,5"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+<Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
+<Style TargetType="PasswordBox"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
+<Style TargetType="DataGrid"><Setter Property="Background" Value="{DynamicResource Glass}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="RowBackground" Value="{DynamicResource Surface}"/><Setter Property="AlternatingRowBackground" Value="{DynamicResource Glass}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource Edge}"/></Style>
+<Style TargetType="DataGridColumnHeader"><Setter Property="Padding" Value="10,8"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
+<Style TargetType="Button"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Padding" Value="14,9"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="box" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}" BorderBrush="{DynamicResource Edge}" BorderThickness="1"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="box" Property="Opacity" Value=".78"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="box" Property="Opacity" Value=".45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+<Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource Surface}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource Edge}"/><Setter Property="Padding" Value="8,5"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
 </Window.Resources>
-<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-<Border Background="#142C44" Padding="18,28"><StackPanel><TextBlock Text="Ultimate Win" FontWeight="SemiBold" FontSize="25" Foreground="White" Margin="6,0,0,32"/><StackPanel Name="Nav"/></StackPanel></Border>
-<Grid Grid.Column="1" Margin="30,24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-<TextBlock Name="Heading" FontSize="30" FontWeight="SemiBold"/><TextBlock Name="Hint" Grid.Row="1" TextWrapping="Wrap" Foreground="#46627A" Margin="0,6,0,18"/>
+<Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<Border Background="{DynamicResource Sidebar}" CornerRadius="18" Padding="14,22" BorderThickness="1" BorderBrush="{DynamicResource Edge}"><DockPanel><Button Name="ThemeSwitch" DockPanel.Dock="Bottom" Margin="2,12,2,0"/><StackPanel><TextBlock Text="Ultimate Win" FontWeight="SemiBold" FontSize="25" Foreground="White" Margin="6,0,0,32"/><StackPanel Name="Nav"/></StackPanel></DockPanel></Border>
+<Border Grid.Column="1" Margin="12,0,0,0" Background="{DynamicResource Glass}" BorderBrush="{DynamicResource Edge}" BorderThickness="1" CornerRadius="18" Padding="24"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<TextBlock Name="Heading" FontSize="30" FontWeight="SemiBold"/><TextBlock Name="Hint" Grid.Row="1" TextWrapping="Wrap" Foreground="{DynamicResource Muted}" Margin="0,6,0,18"/>
 <StackPanel Name="Controls" Grid.Row="2"/><Grid Name="Body" Grid.Row="3" Margin="0,5"/>
-<TextBlock Name="Status" Grid.Row="4" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="#385B72"/></Grid></Grid></Window>
+<TextBlock Name="Status" Grid.Row="4" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Muted}"/></Grid></Border></Grid></Window>
 '@
 $win=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new($layout))
 foreach ($name in 'Heading','Hint','Controls','Body','Status','Nav') {Set-Variable -Name $name -Value $win.FindName($name)}
+$themeFile=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'UltimateWin/theme.txt'
+function SetTheme($dark) {
+    $script:darkTheme=[bool]$dark
+    $palette=if ($dark) {
+        @{Ink='#F1F5FB'; Muted='#ACC2D1'; Glass='#B0181C24'; Surface='#F3242B36'; Sidebar='#CC0A1018'; Edge='#565E7888'; Start='#080B11'; Glow='#15444B'; End='#18152D'}
+    } else {
+        @{Ink='#102C3C'; Muted='#405F71'; Glass='#ACFFFFFF'; Surface='#EAF9FCFF'; Sidebar='#DC183044'; Edge='#887C9EAC'; Start='#C1DCE5'; Glow='#9EE0DC'; End='#D8CFEB'}
+    }
+    $brush=[Windows.Media.BrushConverter]::new()
+    foreach ($key in 'Ink','Muted','Glass','Surface','Sidebar','Edge') {
+        $win.Resources[$key]=$brush.ConvertFromString($palette[$key])
+    }
+    $gradient=[Windows.Media.LinearGradientBrush]::new()
+    $gradient.EndPoint=[Windows.Point]::new(1,0.85)
+    foreach ($stop in @(@('Start',0),@('Glow',0.42),@('End',1))) {
+        $color=[Windows.Media.ColorConverter]::ConvertFromString($palette[$stop[0]])
+        $gradient.GradientStops.Add([Windows.Media.GradientStop]::new($color,$stop[1]))
+    }
+    $win.Resources['Backdrop']=$gradient
+    $themeSwitch.Content=if ($dark) {'☀   Светлая тема'} else {'☾   Тёмная тема'}
+}
+$themeSwitch=$win.FindName('ThemeSwitch')
+$initialDark=$false
+try {
+    if ([IO.File]::Exists($themeFile)) {$initialDark=[IO.File]::ReadAllText($themeFile) -eq 'dark'}
+    else {$initialDark=(Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' AppsUseLightTheme) -eq 0}
+} catch {}
+SetTheme $initialDark
+$themeSwitch.Add_Click({
+    SetTheme (!$darkTheme)
+    try {
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($themeFile))
+        $value=if ($darkTheme) {'dark'} else {'light'}
+        [IO.File]::WriteAllText($themeFile,$value)
+    } catch {$Status.Text='Тема применена только для текущего сеанса'}
+})
 $pages='Обзор','Процессы','Автозагрузка','Устройства','Файлы','Сеть','Диагностика','ИИ-помощник'
 $navButtons=@{}
 $paused=@{}
@@ -57,8 +97,8 @@ function Label($panel,$value,$size) {
 function Table {
     $script:grid=New-Object Windows.Controls.DataGrid
     $grid.IsReadOnly=$true; $grid.CanUserAddRows=$false; $grid.SelectionMode='Single'
-    $grid.Background='White'; $grid.BorderBrush='#D5E1EB'; $grid.RowHeight=32
-    $grid.HeadersVisibility='Column'; $grid.GridLinesVisibility='Horizontal'; $grid.HorizontalGridLinesBrush='#E6EDF3'
+    $grid.RowHeight=34
+    $grid.HeadersVisibility='Column'; $grid.GridLinesVisibility='Horizontal'
     # Explicit columns also support PowerShell custom objects on .NET Framework.
     $grid.AutoGenerateColumns=$false
     [void]$Body.Children.Add($grid)
@@ -68,7 +108,7 @@ function Fill($items) {
     $grid.Columns.Clear()
     if ($data.Count) {
         foreach ($prop in $data[0].PSObject.Properties.Name) {
-            if ($prop -in 'Stamp','Guid') {continue}
+            if ($prop -in 'Stamp','Guid','Target') {continue}
             $col=New-Object Windows.Controls.DataGridTextColumn
             $col.Header=$prop; $col.Binding=New-Object Windows.Data.Binding($prop)
             [void]$grid.Columns.Add($col)
@@ -125,10 +165,12 @@ function Dashboard {
         [void]$stack.Children.Add($cards)
         foreach ($pair in @(@('Процессор',$m.CPU),@('ОЗУ · занято',$m.RAM),@('Видеопамять · занято',$m.VRAM))) {
             $card=New-Object Windows.Controls.Border
-            $card.Background='White'; $card.CornerRadius='12'; $card.Padding='14'; $card.Margin='0,0,8,16'
+            $card.SetResourceReference([Windows.Controls.Border]::BackgroundProperty,'Surface')
+            $card.SetResourceReference([Windows.Controls.Border]::BorderBrushProperty,'Edge')
+            $card.BorderThickness='1'; $card.CornerRadius='12'; $card.Padding='14'; $card.Margin='0,0,8,16'
             $inside=New-Object Windows.Controls.StackPanel
             $card.Child=$inside; [void]$cards.Children.Add($card)
-            (Label $inside $pair[0] 13).Foreground='#47738A'
+            (Label $inside $pair[0] 13).SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty,'Muted')
             (Label $inside $pair[1] 22).FontWeight='SemiBold'
         }
         [void](Label $stack $m.OS 20)
@@ -247,6 +289,14 @@ function Page($name) {
         'Автозагрузка' {
             $Hint.Text='Команды, зарегистрированные для запуска при входе в Windows'
             [void](Button $r 'Обновить' {Page 'Автозагрузка'})
+            [void](Button $r 'Удалить из автозагрузки' {
+                $entry=$grid.SelectedItem
+                if (!$entry) {$Status.Text='Выберите запись автозагрузки';return}
+                $effect=if ($entry.Target.Folder) {'Элемент папки автозагрузки будет перемещён в корзину.'} else {'Будет удалена команда запуска из реестра.'}
+                if (Confirm "Удалить «$($entry.Название)» из автозагрузки?`n$($entry.Пользователь) · $($entry.Источник)`n$effect") {
+                    Run 'param($entry) RemoveStartup $entry; Startup' @($entry) {param($rows) Fill $rows; $Status.Text='Запись удалена из автозагрузки'}
+                }
+            })
             Table;Run 'Startup' @() {param($rows) Fill $rows}
         }
         'Устройства' {
