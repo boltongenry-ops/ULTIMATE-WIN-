@@ -203,10 +203,15 @@ function AppDialog($title,$message,$initial,$accept) {
     $dialog.Owner=$win;$dialog.Title=$title;$dialog.WindowStartupLocation='CenterOwner'
     $dialog.Width=470;$dialog.SizeToContent='Height';$dialog.ResizeMode='NoResize'
     $dialog.Resources.MergedDictionaries.Add($win.Resources)
-    $dialog.Background=$win.Resources['Field'];$dialog.Foreground=$win.Resources['Ink']
+    $dialog.WindowStyle='None';$dialog.AllowsTransparency=$true;$dialog.Background='Transparent'
+    $dialog.Foreground=$win.Resources['Ink']
+    $frame=New-Object Windows.Controls.Border
+    $frame.Background=$win.Resources['Field'];$frame.BorderBrush=$win.Resources['Edge'];$frame.BorderThickness='1';$frame.CornerRadius='14'
+    $dialog.Content=$frame
     $dialog.Icon=$win.Icon;$dialog.FontFamily=$win.FontFamily
-    $panel=New-Object Windows.Controls.StackPanel;$panel.Margin='22';$dialog.Content=$panel
-    (Label $panel $title 20).FontWeight='SemiBold'
+    $panel=New-Object Windows.Controls.StackPanel;$panel.Margin='22';$frame.Child=$panel
+    $dialogTitle=Label $panel $title 20;$dialogTitle.FontWeight='SemiBold'
+    $dialogTitle.Add_MouseLeftButtonDown({$dialog.DragMove()})
     [void](Label $panel $message 14)
     if ($null -ne $initial) {
         $box=New-Object Windows.Controls.TextBox;$box.Text=$initial;$box.Margin='0,8,0,4'

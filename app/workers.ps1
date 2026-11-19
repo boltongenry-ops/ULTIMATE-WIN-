@@ -438,8 +438,8 @@ function SaveDriverPackage($package,$folder) {
     $hostName=$hosts[[string]$package.source]
     $uri=[uri]$package.url
     if (!$hostName -or $package.sha256 -notmatch '\A[0-9a-f]{64}\z') {throw 'Нет проверенной контрольной суммы'}
-    $name=[IO.Path]::GetFileName($uri.AbsolutePath)
-    if ($name -notmatch '\A[a-z0-9][a-z0-9._-]*\.(exe|cab|zip|msi)\z') {throw 'Неизвестный формат пакета'}
+    $name=[uri]::UnescapeDataString([IO.Path]::GetFileName($uri.AbsolutePath))
+    if ($name -notmatch '\A[a-z0-9][a-z0-9._ -]*\.(exe|cab|zip|msi)\z') {throw 'Неизвестный формат пакета'}
     [void][IO.Directory]::CreateDirectory($folder)
     $final=Join-Path $folder $name
     if (Test-Path -LiteralPath $final) {
