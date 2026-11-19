@@ -30,12 +30,12 @@ $themeFile=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Ult
 function SetTheme($dark) {
     $script:darkTheme=[bool]$dark
     $palette=if ($dark) {
-        @{Ink='#F1F5FB'; Muted='#ACC2D1'; Glass='#B0181C24'; Surface='#F3242B36'; Sidebar='#CC0A1018'; Edge='#565E7888'; Start='#080B11'; Glow='#15444B'; End='#18152D'}
+        @{Outgoing='#EB20454A'; Ink='#F1F5FB'; Muted='#ACC2D1'; Glass='#B0181C24'; Surface='#F3242B36'; Sidebar='#CC0A1018'; Edge='#565E7888'; Start='#080B11'; Glow='#15444B'; End='#18152D'}
     } else {
-        @{Ink='#102C3C'; Muted='#405F71'; Glass='#ACFFFFFF'; Surface='#EAF9FCFF'; Sidebar='#DC183044'; Edge='#887C9EAC'; Start='#C1DCE5'; Glow='#9EE0DC'; End='#D8CFEB'}
+        @{Outgoing='#EDC9ECE8'; Ink='#102C3C'; Muted='#405F71'; Glass='#ACFFFFFF'; Surface='#EAF9FCFF'; Sidebar='#DC183044'; Edge='#887C9EAC'; Start='#C1DCE5'; Glow='#9EE0DC'; End='#D8CFEB'}
     }
     $brush=[Windows.Media.BrushConverter]::new()
-    foreach ($key in 'Ink','Muted','Glass','Surface','Sidebar','Edge') {
+    foreach ($key in 'Outgoing','Ink','Muted','Glass','Surface','Sidebar','Edge') {
         $win.Resources[$key]=$brush.ConvertFromString($palette[$key])
     }
     $gradient=[Windows.Media.LinearGradientBrush]::new()
@@ -69,7 +69,11 @@ $history=New-Object Collections.ArrayList
 $baseUrl='https://opencode.ai/inference/go/openai/v1'
 $selectedModel=''
 $sessionKey=''
-$transcript=''
+$chatEntries=New-Object Collections.ArrayList
+$draft=''
+$snapshot=''
+$conversationEndpoint=$baseUrl
+$chatSession=[guid]::NewGuid().ToString()
 $root=[Environment]::GetFolderPath('MyDocuments')
 $mode='size'
 $backgroundOnly=$false
@@ -224,8 +228,8 @@ function ActionResult($result) {
     $Status.Text=$result
     if ($active -eq 'ИИ-помощник') {
         [void]$history.Add(@{role='user';content="Результат подтверждённого действия Windows: $result"})
-        $script:transcript+="Windows · $result`r`n`r`n"
-        $log.Text=$transcript;$log.ScrollToEnd()
+        [void]$chatEntries.Add(@{Author='Windows';Text=$result})
+        ShowConversation
     }
 }
 function Action($id) {
@@ -237,12 +241,76 @@ function Action($id) {
         verify {Elevated "$env:SystemRoot\System32\sfc.exe" '/verifyonly'}
     }
 }
+function ResetChat {
+    $script:chatSession=[guid]::NewGuid().ToString()
+    $history.Clear()
+    $chatEntries.Clear()
+    $script:pending=''
+    $script:snapshot=''
+    $script:draft=''
+    $apply.Visibility='Collapsed'
+    $inputBox.Clear()
+    $attachment.Content='Приложить сводку'
+    ShowConversation
+}
+function ShowConversation {
+    $thread.Children.Clear()
+    if (!$chatEntries.Count) {
+        $welcome=Label $thread 'Чем помочь с Windows?' 23
+        $welcome.FontWeight='SemiBold'
+        $suggestions=New-Object Windows.Controls.WrapPanel
+        [void]$thread.Children.Add($suggestions)
+        foreach ($prompt in @(
+            @('Компьютер тормозит','Компьютер стал работать медленнее. Как определить причину?'),
+            @('Пропадает интернет','Интернет периодически пропадает. Помоги проверить соединение по шагам.'),
+            @('Мало места','Как выяснить, какие файлы занимают место, и что можно безопасно удалить?')
+        )) {
+            $b=Button $suggestions $prompt[0] {param($sender,$e)
+                if ($inputBox.Text.Trim() -and !(Confirm 'Заменить черновик выбранным вопросом?')) {return}
+                $inputBox.Text=$sender.Tag
+                [void]$inputBox.Focus()
+                $inputBox.CaretIndex=$inputBox.Text.Length
+            }
+            $b.Tag=$prompt[1]
+        }
+        return
+    }
+    foreach ($entry in $chatEntries) {
+        $card=New-Object Windows.Controls.Border
+        $card.CornerRadius='13';$card.Padding='14,8';$card.BorderThickness='1'
+        $card.Margin=if ($entry.Author -eq 'Вы') {'48,4,0,6'} else {'0,4,30,6'}
+        $surface=if ($entry.Author -eq 'Вы') {'Outgoing'} else {'Surface'}
+        $card.SetResourceReference([Windows.Controls.Border]::BackgroundProperty,$surface)
+        $card.SetResourceReference([Windows.Controls.Border]::BorderBrushProperty,'Edge')
+        $content=New-Object Windows.Controls.StackPanel
+        $card.Child=$content
+        $title=Label $content $entry.Author 12
+        $title.FontWeight='SemiBold'
+        $title.SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty,'Muted')
+        $text=New-Object Windows.Controls.TextBox
+        $text.IsReadOnly=$true;$text.Background='Transparent';$text.BorderThickness='0'
+        $text.Padding='0';$text.TextWrapping='Wrap';$text.FontSize=15;$text.Text=$entry.Text
+        [void]$content.Children.Add($text)
+        if ($entry.Author -eq 'Помощник' -and $entry.Text) {
+            $copy=Button $content 'Копировать ответ' {param($sender,$e)
+                [Windows.Clipboard]::SetText($sender.Tag)
+                $Status.Text='Ответ скопирован'
+            }
+            $copy.Tag=$entry.Text;$copy.HorizontalAlignment='Left';$copy.Padding='7,3';$copy.Margin='0,8,0,0'
+        }
+        [void]$thread.Children.Add($card)
+    }
+    $scroll.ScrollToEnd()
+}
 function RememberChat {
     $script:baseUrl=$endpoint.Text.Trim();$script:sessionKey=$secret.Password;$script:selectedModel=$model.Text.Trim()
     if ($script:conversationEndpoint -ne $baseUrl) {
-        $script:chatSession=[guid]::NewGuid().ToString();$history.Clear();$script:transcript='';$script:pending='';$script:conversationEndpoint=$baseUrl
-        $log.Text='';$apply.Visibility='Collapsed'
+        $keepDraft=$inputBox.Text
+        ResetChat
+        $inputBox.Text=$keepDraft
+        $script:conversationEndpoint=$baseUrl
     }
+    $script:draft=$inputBox.Text
 }
 function SendChat {
     RememberChat
@@ -252,15 +320,20 @@ function SendChat {
     $script:sent=$question
     $sys='Отвечай по-русски. Ты помощник по Windows. Для предложения действия добавь отдельной последней строкой ACTION: dns, ACTION: verify или ACTION: metrics. Доступны только эти действия после согласия пользователя. Не утверждай, что действие выполнено.'
     $messages=@(@{role='system';content=$sys}) + @($history) + @(@{role='user';content=$question})
-    Run 'param($url,$key,$model,$msgs,$share,$sid) if($share){$msgs=@($msgs)+@(@{role="user";content=("Сводка Windows: "+((Metrics)|ConvertTo-Json -Compress))})}; Api $url $key $model $msgs $false $sid' @($baseUrl,$sessionKey,$selectedModel,$messages,$share.IsChecked,$chatSession) {param($rows)
+    if ($snapshot) {$messages+=@{role='user';content="Сводка Windows: $snapshot"}}
+    Run 'param($url,$key,$model,$msgs,$sid) Api $url $key $model $msgs $false $sid' @($baseUrl,$sessionKey,$selectedModel,$messages,$chatSession) {param($rows)
         $answer=[string]$rows[0]
         [void]$history.Add(@{role='user';content=$sent});[void]$history.Add(@{role='assistant';content=$answer})
         if ($answer -match '(?m)^ACTION: (dns|verify|metrics)\s*\z') {
             $script:pending=$Matches[1];$answer=$answer.Substring(0,$answer.LastIndexOf('ACTION:')).TrimEnd()
             $apply.Content=$approvedActions[$pending];$apply.Visibility='Visible'
         }
-        $script:transcript+="Вы · $sent`r`n`r`nПомощник · $answer`r`n`r`n"
-        $log.Text=$transcript;$log.ScrollToEnd();$inputBox.Clear()
+        [void]$chatEntries.Add(@{Author='Вы';Text=$sent})
+        if ($snapshot) {[void]$chatEntries.Add(@{Author='Сводка Windows';Text=$snapshot})}
+        [void]$chatEntries.Add(@{Author='Помощник';Text=$answer})
+        $script:snapshot='';$attachment.Content='Приложить сводку'
+        $inputBox.Clear();$script:draft=''
+        ShowConversation
     }
 }
 function Page($name) {
@@ -353,14 +426,21 @@ function Page($name) {
             })
         }
         'ИИ-помощник' {
-            $Hint.Text='Подключите OpenCode Go или совместимый Chat Completions API. Ключ хранится в памяти до закрытия приложения.'
+            $Hint.Text='Обсудите проблему и выберите следующий шаг.'
+            $settings=New-Object Windows.Controls.Expander
+            $settings.Header='Подключение и модель';$settings.Margin='0,0,0,8'
+            $settings.SetResourceReference([Windows.Controls.Control]::ForegroundProperty,'Ink')
+            $settings.IsExpanded=!($sessionKey -and $selectedModel)
+            [void]$Controls.Children.Add($settings)
+            $fields=New-Object Windows.Controls.StackPanel;$settings.Content=$fields
+            $r=New-Object Windows.Controls.WrapPanel;[void]$fields.Children.Add($r)
             [void](Label $r 'Адрес API' 13)
-            $script:endpoint=New-Object Windows.Controls.TextBox;$endpoint.Width=255;$endpoint.Text=$baseUrl;[void]$r.Children.Add($endpoint)
+            $script:endpoint=New-Object Windows.Controls.TextBox;$endpoint.Width=245;$endpoint.Text=$baseUrl;[void]$r.Children.Add($endpoint)
             [void](Label $r ' API-ключ' 13)
-            $script:secret=New-Object Windows.Controls.PasswordBox;$secret.Width=165;$secret.Password=$sessionKey;[void]$r.Children.Add($secret)
-            $r=Row
+            $script:secret=New-Object Windows.Controls.PasswordBox;$secret.Width=155;$secret.Password=$sessionKey;[void]$r.Children.Add($secret)
+            $r=New-Object Windows.Controls.WrapPanel;[void]$fields.Children.Add($r)
             [void](Label $r 'Модель' 13)
-            $script:model=New-Object Windows.Controls.ComboBox;$model.IsEditable=$true;$model.Width=210;$model.Text=$selectedModel;[void]$r.Children.Add($model)
+            $script:model=New-Object Windows.Controls.ComboBox;$model.IsEditable=$true;$model.Width=205;$model.Text=$selectedModel;[void]$r.Children.Add($model)
             [void](Button $r 'Загрузить модели' {
                 RememberChat
                 if (!$sessionKey) {$Status.Text='Введите API-ключ';return}
@@ -369,16 +449,39 @@ function Page($name) {
                     $Status.Text="Моделей: $($rows.Count)"
                 }
             })
-            $script:share=New-Object Windows.Controls.CheckBox;$share.Content='Приложить сводку Windows';$share.VerticalAlignment='Center';[void]$r.Children.Add($share)
             $dock=New-Object Windows.Controls.DockPanel;[void]$Body.Children.Add($dock)
             $bottom=New-Object Windows.Controls.StackPanel;[Windows.Controls.DockPanel]::SetDock($bottom,'Bottom');[void]$dock.Children.Add($bottom)
-            $script:inputBox=New-Object Windows.Controls.TextBox;$inputBox.Height=54;$inputBox.TextWrapping='Wrap';$inputBox.AcceptsReturn=$true;[void]$bottom.Children.Add($inputBox)
+            $script:inputBox=New-Object Windows.Controls.TextBox;$inputBox.Height=58;$inputBox.Margin='0,8,0,6';$inputBox.TextWrapping='Wrap';$inputBox.AcceptsReturn=$true;$inputBox.Text=$draft;$inputBox.VerticalScrollBarVisibility='Auto'
+            $inputBox.ToolTip='Ctrl+Enter — отправить';[void]$bottom.Children.Add($inputBox)
+            $inputBox.Add_PreviewKeyDown({param($sender,$e)
+                if ($e.Key -eq 'Return' -and [Windows.Input.Keyboard]::Modifiers -eq 'Control') {$e.Handled=$true;SendChat}
+            })
             $bar=New-Object Windows.Controls.WrapPanel;[void]$bottom.Children.Add($bar)
-            [void](Button $bar 'Отправить' {SendChat})
+            $send=Button $bar 'Отправить' {SendChat}
+            $send.Background='#176A70';$send.Foreground='White'
+            $script:attachment=Button $bar 'Приложить сводку' {
+                if ($snapshot) {
+                    $script:snapshot='';$attachment.Content='Приложить сводку';return
+                }
+                Run 'Metrics | ConvertTo-Json' @() {param($rows)
+                    $preview=[string]$rows[0]
+                    if (Confirm "Добавить эту сводку к следующему сообщению?`n`n$preview") {
+                        $script:snapshot=$preview;$attachment.Content='Убрать сводку'
+                    }
+                }
+            }
+            if ($snapshot) {$attachment.Content='Убрать сводку'}
+            [void](Button $bar 'Новый чат' {
+                if (($chatEntries.Count -or $inputBox.Text -or $snapshot) -and !(Confirm 'Очистить переписку и начать новый чат?')) {return}
+                ResetChat
+            })
             $script:apply=Button $bar 'Выполнить' {Action $pending}
             if ($pending) {$apply.Content=$approvedActions[$pending]} else {$apply.Visibility='Collapsed'}
-            $script:log=New-Object Windows.Controls.TextBox;$log.IsReadOnly=$true;$log.TextWrapping='Wrap';$log.VerticalScrollBarVisibility='Auto';$log.Text=$transcript
-            [void]$dock.Children.Add($log)
+            $script:scroll=New-Object Windows.Controls.ScrollViewer
+            $scroll.VerticalScrollBarVisibility='Auto';$scroll.HorizontalScrollBarVisibility='Disabled'
+            $script:thread=New-Object Windows.Controls.StackPanel;$scroll.Content=$thread
+            [void]$dock.Children.Add($scroll)
+            ShowConversation
         }
     }
 }
