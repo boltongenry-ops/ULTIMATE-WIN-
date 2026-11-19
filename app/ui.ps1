@@ -211,6 +211,28 @@ function AppDialog($title,$message,$initial,$accept) {
         $box=New-Object Windows.Controls.TextBox;$box.Text=$initial;$box.Margin='0,8,0,4'
         [void]$panel.Children.Add($box)
         $problem=Label $panel '' 13
+        $listing=New-Object Windows.Controls.ListBox
+        $listing.Height=150;$listing.Background=$win.Resources['Field'];$listing.Foreground=$win.Resources['Ink']
+        $listing.BorderBrush=$win.Resources['Edge'];$listing.DisplayMemberPath='Name'
+        $browse={
+            try {
+                $here=Get-Item -LiteralPath $box.Text.Trim() -Force -ErrorAction Stop
+                if ($here -isnot [IO.DirectoryInfo]) {throw 'folder'}
+                $listing.ItemsSource=@(Get-ChildItem -LiteralPath $here.FullName -Directory -ErrorAction Stop | Sort-Object Name)
+                $problem.Text=''
+            } catch {$listing.ItemsSource=$null;$problem.Text='Не удалось открыть папку'}
+        }
+        $tools=New-Object Windows.Controls.WrapPanel;[void]$panel.Children.Add($tools)
+        [void](Button $tools 'На уровень выше' {
+            $parent=[IO.Directory]::GetParent($box.Text.Trim())
+            if ($parent) {$box.Text=$parent.FullName;& $browse}
+        })
+        [void](Button $tools 'Показать папки' {& $browse})
+        $listing.Add_MouseDoubleClick({
+            if ($listing.SelectedItem) {$box.Text=$listing.SelectedItem.FullName;& $browse}
+        })
+        [void]$panel.Children.Add($listing)
+        & $browse
     }
     $buttons=New-Object Windows.Controls.WrapPanel;$buttons.Margin='0,12,0,0';$buttons.HorizontalAlignment='Right'
     [void]$panel.Children.Add($buttons)

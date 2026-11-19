@@ -40,7 +40,7 @@ function Startup {
             $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive,$view)
             try {
                 foreach ($leaf in 'Run','RunOnce') {
-                    $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion`$leaf")
+                    $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\$leaf")
                     if (!$key) {continue}
                     try {
                         foreach ($name in $key.GetValueNames()) {
@@ -76,7 +76,7 @@ function RemoveStartup($row) {
     if ($t.Hive -notin 'CurrentUser','LocalMachine' -or $t.View -notin 'Registry32','Registry64' -or $t.Leaf -notin 'Run','RunOnce') {throw 'Неизвестный источник'}
     $base=[Microsoft.Win32.RegistryKey]::OpenBaseKey($t.Hive,$t.View)
     try {
-        $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion`$($t.Leaf)",$true)
+        $key=$base.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\$($t.Leaf)",$true)
         if (!$key) {throw 'Раздел автозагрузки недоступен'}
         try {
             if ($key.GetValue($row.Название,$null,'DoNotExpandEnvironmentNames') -cne $row.Команда) {throw 'Запись изменилась. Обновите список.'}
