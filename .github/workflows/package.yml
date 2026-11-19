@@ -1,0 +1,26 @@
+name: Publish NuGet archive
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'UltimateWin.nuspec'
+      - 'dist/*.zip'
+      - '.github/workflows/package.yml'
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: NuGet/setup-nuget@v2
+      - name: Pack the Windows archive
+        run: nuget pack UltimateWin.nuspec -OutputDirectory package -NonInteractive
+      - name: Publish to GitHub Packages
+        env:
+          PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $package = Get-Item package/*.nupkg
+          dotnet nuget push $package.FullName --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --api-key $env:PACKAGE_TOKEN --skip-duplicate

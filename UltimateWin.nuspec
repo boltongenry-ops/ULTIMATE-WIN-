@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>UltimateWin.Windows</id>
+    <version>0.1.0</version>
+    <authors>boltongenry-ops</authors>
+    <description>Ultimate Win для Windows x64 с поддержкой OpenCode Go. Распакуйте вложенный ZIP и запустите UltimateWin.exe.</description>
+    <repository type="git" url="https://github.com/boltongenry-ops/ULTIMATE-WIN-" />
+  </metadata>
+  <files>
+    <file src="dist/UltimateWin-0.1.0-win-x64.zip" target="tools" />
+  </files>
+</package>
