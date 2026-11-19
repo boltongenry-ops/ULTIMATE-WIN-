@@ -396,8 +396,16 @@ function MemoryModules {
 }
 
 function DriverCatalog($localOnly) {
-    $json=& $env:ULTIMATEWIN_EXE --driver-catalog
-    if ($LASTEXITCODE -ne 0 -or !$json) {throw 'Не удалось прочитать каталог драйверов'}
+    $info=[Diagnostics.ProcessStartInfo]::new($env:ULTIMATEWIN_EXE,'--driver-catalog')
+    $info.UseShellExecute=$false
+    $info.RedirectStandardOutput=$true
+    $info.CreateNoWindow=$true
+    $reader=[Diagnostics.Process]::Start($info)
+    try {
+        $json=$reader.StandardOutput.ReadToEnd()
+        $reader.WaitForExit()
+        if ($reader.ExitCode -ne 0 -or !$json) {throw "Не удалось прочитать каталог драйверов (код $($reader.ExitCode))"}
+    } finally {$reader.Dispose()}
     $records=ConvertFrom-Json -InputObject ([string]$json)
     if ($localOnly) {
         $system=Get-CimInstance Win32_ComputerSystem
