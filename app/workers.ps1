@@ -8,7 +8,7 @@ function Metrics {
     $vram = 'Нет данных драйвера'
     if ($gpu.Count) { $vram = '{0:N2} ГиБ' -f (($gpu | Measure-Object DedicatedUsage -Sum).Sum / 1GB) }
     [pscustomobject]@{
-        CPU = if ($null -ne $cpu.PercentProcessorTime) {'{0} %' -f $cpu.PercentProcessorTime} else {'Нет данных'}
+        CPU = $(if ($null -ne $cpu.PercentProcessorTime) {'{0} %' -f $cpu.PercentProcessorTime} else {'Нет данных'})
         RAM = ('{0:N1} / {1:N1} ГиБ' -f $ram, ($os.TotalVisibleMemorySize / 1MB))
         VRAM = $vram
         OS = "$($os.Caption) · $($os.Version)"
@@ -215,7 +215,7 @@ function LoadSample {
         $os=Get-CimInstance Win32_OperatingSystem -OperationTimeoutSec 4
         $samples += [pscustomobject]@{
             CPU=$cpu.PercentProcessorTime
-            Disk=if ($null -ne $disk.PercentIdleTime) {100-[math]::Min(100,$disk.PercentIdleTime)}
+            Disk=$(if ($null -ne $disk.PercentIdleTime) {100-[math]::Min(100.0,[double]$disk.PercentIdleTime)})
             RAM=100*(1-$os.FreePhysicalMemory/$os.TotalVisibleMemorySize)
         }
         if ($clock.Elapsed.TotalSeconds -lt 30) {Start-Sleep -Milliseconds 1500}
