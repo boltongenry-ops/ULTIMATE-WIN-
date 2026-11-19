@@ -13,10 +13,20 @@ import (
 	"unsafe"
 )
 
-//go:embed app/*.ps1
+//go:embed app/*.ps1 assets/drivers.json
 var files embed.FS
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--driver-catalog" {
+		data, err := files.ReadFile("assets/drivers.json")
+		if err != nil {
+			os.Exit(1)
+		}
+		if _, err = os.Stdout.Write(data); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	var script bytes.Buffer
 	script.WriteString("$ErrorActionPreference='Stop'\n")
 	for _, name := range []string{"workers", "ui"} {

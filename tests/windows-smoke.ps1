@@ -23,6 +23,14 @@ try {
         Remove-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue
     }
 }
+$env:ULTIMATEWIN_EXE=$exe
+$packages=@(DriverCatalog $false)
+foreach ($source in 'Dell','Lenovo','Google') {if ($source -notin $packages.Источник) {throw "Missing driver source $source"}}
+$google=@($packages | Where-Object Источник -eq 'Google')[0].Target
+$downloads=Join-Path $folder 'downloads'
+[void](SaveDriverPackage $google $downloads)
+$received=Get-Item (Join-Path $downloads 'usb_driver_r13-windows.zip')
+if ((Get-FileHash $received.FullName).Hash -ne $google.sha256) {throw 'Google driver checksum mismatch'}
 # DiskPart selects only a newly created scratch VHD; no existing disk is selected.
 $letter=@(82..90 | ForEach-Object {[char]$_} | Where-Object {![IO.Directory]::Exists("${_}:\")})[0]
 if (!$letter) {throw 'No letter available for the scratch volume'}
@@ -86,13 +94,10 @@ try {
         if ($status.Current.Name -like 'Ошибка*') {throw $status.Current.Name}
         if ($page -in 'Процессы','Автозагрузка','Устройства','Драйверы','Программы','Диски','Память','Сеть' -and $status.Current.Name -notlike 'Строк:*') {throw "List did not load: $page"}
         if ($page -in 'Драйверы','Программы','Диски','Память' -and $status.Current.Name -notmatch '^Строк: [1-9]') {throw "Empty inventory: $page · $($status.Current.Name)"}
-        if ($page -eq 'Программы') {
-            $search=FindElement $window $autoId 'InventorySearch' 'Descendants'
-            $pattern=$search.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
-            $pattern.SetValue([guid]::NewGuid().ToString())
-            [void](WaitFor {$status.Current.Name -eq 'Строк: 0'} 'filtered inventory')
-            $pattern.SetValue('')
-            [void](WaitFor {$status.Current.Name -match '^Строк: [1-9]'} 'restored inventory')
+        if ($page -eq 'Драйверы') {
+            $catalog=FindElement $window ([Windows.Automation.AutomationElement]::NameProperty) 'Каталог пакетов' 'Descendants'
+            $catalog.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+            [void](WaitFor {$status.Current.Name -eq "Строк: $($packages.Count)"} 'bundled driver index')
         }
         if ($page -eq 'Диагностика') {
             $start=FindElement $window ([Windows.Automation.AutomationElement]::NameProperty) 'Почему тормозит ПК?' 'Descendants'

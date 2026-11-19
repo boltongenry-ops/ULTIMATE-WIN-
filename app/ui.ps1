@@ -541,8 +541,21 @@ function Page($name) {
             Table;Run 'DiskPartitions' @() {param($rows) Fill $rows}
         }
         'Драйверы' {
-            $Hint.Text='Версии, поставщики и подписи установленных драйверов.'
-            [void](Button $r 'Обновить список' {Page 'Драйверы'})
+            $Hint.Text='Ищите по модели ПК или аппаратному ID. Каталог содержит пакеты Dell, Lenovo и USB-драйвер Google. Загрузки сохраняются в папке Ultimate Win внутри «Загрузок».'
+            [void](Button $r 'Установленные' {Page 'Драйверы'})
+            [void](Button $r 'Каталог пакетов' {Run 'DriverCatalog $false' @() {param($rows) Fill $rows} 'Открываем каталог'})
+            [void](Button $r 'Для моего ПК' {Run 'DriverCatalog $true' @() {param($rows)
+                Fill $rows
+                if (!$rows.Count) {$Status.Text='Совпадений в каталоге нет. Можно искать вручную по модели или ID.'}
+            } 'Сопоставляем модель и оборудование'})
+            [void](Button $r 'Скачать пакет' {
+                $package=$grid.SelectedItem.Target
+                if (!$package.sha256) {$Status.Text='Выберите строку в каталоге пакетов';return}
+                $folder=(Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders' -Name '{374DE290-123F-4565-9164-39C4925E467B}' -ErrorAction SilentlyContinue).'{374DE290-123F-4565-9164-39C4925E467B}'
+                if (!$folder) {$folder=Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'}
+                $folder=Join-Path ([Environment]::ExpandEnvironmentVariables($folder)) 'Ultimate Win'
+                Run 'param($p,$f) SaveDriverPackage $p $f' @($package,$folder) {param($rows) $Status.Text=$rows[0]} 'Загрузка и проверка пакета'
+            })
             [void](Button $r 'Экспорт INF' {
                 $inf=$grid.SelectedItem.INF
                 if ($inf -notmatch '^oem[0-9]+\.inf$') {$Status.Text='Для экспорта выберите сторонний пакет oem*.inf';return}
@@ -551,7 +564,6 @@ function Page($name) {
                     Run 'param($inf,$dest) if($inf -notmatch "^oem[0-9]+\.inf$"){throw "Недопустимое имя INF"}; $out=& "$env:SystemRoot\System32\pnputil.exe" /export-driver $inf $dest; if($LASTEXITCODE){throw ($out -join " ")}' @($inf,$folder) {$Status.Text='Пакет драйвера экспортирован'}
                 }
             })
-            [void](Button $r 'Windows Update' {Start-Process 'ms-settings:windowsupdate'})
             SearchTable
             Table;Run 'DriverList' @() {param($rows) Fill $rows}
         }

@@ -17,6 +17,7 @@ jobs:
           $version = (Get-Content VERSION -Raw).Trim()
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {throw 'Tag must match VERSION'}
           try {
+            ./tests/inventory-ui.ps1
             ./tests/windows-smoke.ps1 -Archive "dist/UltimateWin-$version-win-x64.zip"
           } catch {
             $message = $_.Exception.GetBaseException().Message + ' ' + $_.ScriptStackTrace

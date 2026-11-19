@@ -394,3 +394,77 @@ function MemoryOverview {
 function MemoryModules {
     Get-CimInstance Win32_PhysicalMemory | Select-Object @{n='Слот';e={$_.DeviceLocator}},@{n='Объём, ГиБ';e={[math]::Round($_.Capacity/1GB,2)}},@{n='Производитель';e={$_.Manufacturer}},@{n='Модель';e={$_.PartNumber}},@{n='Скорость, MT/s';e={$_.ConfiguredClockSpeed}}
 }
+
+function DriverCatalog($localOnly) {
+    $json=& $env:ULTIMATEWIN_EXE --driver-catalog
+    if ($LASTEXITCODE -ne 0 -or !$json) {throw 'Не удалось прочитать каталог драйверов'}
+    $records=ConvertFrom-Json -InputObject ([string]$json)
+    if ($localOnly) {
+        $system=Get-CimInstance Win32_ComputerSystem
+        $model=[string]$system.Model
+        $vendor=[string]$system.Manufacturer
+        $product=Get-CimInstance Win32_ComputerSystemProduct
+        $sku=[string]$system.SystemSKUNumber
+        $os=if ([int](Get-CimInstance Win32_OperatingSystem).BuildNumber -ge 22000) {'11'} else {'10'}
+        $hardware=@{}
+        foreach ($device in Get-CimInstance Win32_PnPEntity -Property HardwareID) {
+            foreach ($id in $device.HardwareID) {if ($id) {$hardware[$id]=$true}}
+        }
+    }
+    foreach ($driver in $records) {
+        if ($localOnly) {
+            if ($driver.os -ne '10/11' -and $driver.os -ne $os) {continue}
+            $match=switch ($driver.source) {
+                Dell {$vendor -match 'Dell' -and ($driver.model -eq $model -or $sku -in $driver.ids)}
+                Lenovo {$vendor -match 'Lenovo' -and ($driver.model -eq $product.Version -or ($model.Length -ge 4 -and $model.Substring(0,4) -in $driver.ids))}
+                Google {foreach ($id in $driver.ids) {if ($hardware.ContainsKey($id)) {$true;break}}}
+            }
+            if (!$match) {continue}
+        }
+        [pscustomobject]@{Источник=$driver.source;Модель=$driver.model;Windows=$driver.os;Версия=$driver.version;Идентификаторы=($driver.ids -join ', ');Target=$driver}
+    }
+}
+
+function SaveDriverPackage($package,$folder) {
+    $hosts=@{Dell='downloads.dell.com';Lenovo='download.lenovo.com';Google='dl.google.com'}
+    $hostName=$hosts[[string]$package.source]
+    $uri=[uri]$package.url
+    if (!$hostName -or $package.sha256 -notmatch '\A[0-9a-f]{64}\z') {throw 'Нет проверенной контрольной суммы'}
+    $name=[IO.Path]::GetFileName($uri.AbsolutePath)
+    if ($name -notmatch '\A[a-z0-9][a-z0-9._-]*\.(exe|cab|zip|msi)\z') {throw 'Неизвестный формат пакета'}
+    [void][IO.Directory]::CreateDirectory($folder)
+    $final=Join-Path $folder $name
+    if (Test-Path -LiteralPath $final) {
+        if ((Get-FileHash -LiteralPath $final).Hash -eq $package.sha256) {return "Уже скачан и проверен: $final"}
+        throw 'В папке уже есть другой файл с таким именем'
+    }
+    $partial=Join-Path $folder ([guid]::NewGuid().ToString('N')+'.part')
+    [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+    try {
+        for ($hop=0;$hop -lt 5;$hop++) {
+            if ($uri.Scheme -ne 'https' -or $uri.Host -ne $hostName -or !$uri.IsDefaultPort -or $uri.UserInfo) {throw 'Ссылка ведёт за пределы официального источника'}
+            $request=[Net.HttpWebRequest]::Create($uri)
+            $request.AllowAutoRedirect=$false
+            $request.Timeout=30000;$request.ReadWriteTimeout=30000
+            $response=$request.GetResponse()
+            try {
+                if ([int]$response.StatusCode -in 301,302,303,307,308) {
+                    $uri=[uri]::new($uri,$response.Headers['Location'])
+                    continue
+                }
+                if ([int]$response.StatusCode -ne 200) {throw "HTTP $([int]$response.StatusCode)"}
+                $stream=$response.GetResponseStream()
+                $output=[IO.File]::Open($partial,'CreateNew','Write','None')
+                try {
+                    $buffer=New-Object byte[] 262144
+                    while (($count=$stream.Read($buffer,0,$buffer.Length)) -gt 0) {$output.Write($buffer,0,$count)}
+                    if ($response.ContentLength -ge 0 -and $output.Length -ne $response.ContentLength) {throw 'Загрузка прервана'}
+                } finally {$output.Dispose();$stream.Dispose()}
+                break
+            } finally {$response.Dispose()}
+        }
+        if (!(Test-Path -LiteralPath $partial) -or (Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash -ne $package.sha256) {throw 'Пакет не прошёл проверку SHA-256'}
+        [IO.File]::Move($partial,$final)
+        "Скачан и проверен: $final · SHA-256 $($package.sha256)"
+    } finally {if ([IO.File]::Exists($partial)) {[IO.File]::Delete($partial)}}
+}
