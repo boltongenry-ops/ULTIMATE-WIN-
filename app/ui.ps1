@@ -331,7 +331,12 @@ function ShowConversation {
     $scroll.ScrollToEnd()
 }
 function RememberChat {
-    $script:baseUrl=$endpoint.Text.Trim();$script:sessionKey=$secret.Password;$script:selectedModel=$model.Text.Trim()
+    $nextEndpoint=$endpoint.Text.Trim()
+    if ($nextEndpoint.TrimEnd('/') -ne $baseUrl.TrimEnd('/') -and $sessionKey -and $secret.Password -ceq $sessionKey) {
+        $secret.Clear()
+        $Status.Text='Адрес изменился. Введите ключ для нового API.'
+    }
+    $script:baseUrl=$nextEndpoint;$script:sessionKey=$secret.Password;$script:selectedModel=$model.Text.Trim()
     if ($script:conversationEndpoint -ne $baseUrl) {
         $keepDraft=$inputBox.Text
         ResetChat

@@ -55,6 +55,18 @@ try {
         [void](WaitFor {(FindElement $window $autoId 'Heading' 'Descendants').Current.Name -eq $page -and $button.Current.IsEnabled} $page)
         if ($status.Current.Name -like 'Ошибка*') {throw $status.Current.Name}
         if ($page -in 'Процессы','Автозагрузка','Устройства','Сеть' -and $status.Current.Name -notlike 'Строк:*') {throw "List did not load: $page"}
+        if ($page -eq 'Диагностика') {
+            $start=FindElement $window ([Windows.Automation.AutomationElement]::NameProperty) 'Почему тормозит ПК?' 'Descendants'
+            $start.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+            $cancel=WaitFor {
+                $control=FindElement $window $autoId 'CancelRead' 'Descendants'
+                if ($control -and !$control.Current.IsOffscreen) {$control}
+            } 'cancel button'
+            $cancel.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+            [void](WaitFor {$status.Current.Name -eq 'Проверка отменена' -and $start.Current.IsEnabled} 'sampling cancellation')
+            $start.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+            [void](WaitFor {$status.Current.Name -like 'Измерение завершено*'} 'completed load report')
+        }
     }
     $window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close()
     if (!$process.WaitForExit(10000) -or $process.ExitCode -ne 0) {throw 'Application failed to close normally'}
